@@ -69,6 +69,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
-          # Solo el dashboard usa este build-arg (el backend lo ignora).
+          # Solo el dashboard usa este build-arg (el backend lo ignora). El valor
+          # por defecto es la URL pública del backend en producción; se puede
+          # sobreescribir con la variable de repositorio NEXT_PUBLIC_API_URL.
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:3001' }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://api.escuelastop.pymesenlinea.com.ar' }}

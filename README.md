@@ -145,13 +145,26 @@ and variables → Actions → Variables); cambiarla requiere re-correr el workfl
 
 ## Autenticación del dashboard
 
-Las rutas del panel están protegidas. Antes de ingresar hay que crear el
-usuario de administración:
+Las rutas del panel están protegidas. Hay dos formas de crear el usuario admin:
+
+**a) Automático al arrancar (recomendado con Docker).** Definí `ADMIN_EMAIL` y
+`ADMIN_PASSWORD` en el `.env`; el backend crea/actualiza ese usuario en cada
+arranque (idempotente):
+
+```env
+ADMIN_EMAIL=admin@escuelastop.com.ar
+ADMIN_PASSWORD=una-clave-segura
+```
+
+**b) Manual, con el seed:**
 
 ```bash
-# Definí las credenciales y ejecutá el seed (usa DATABASE_URL del .env)
 ADMIN_EMAIL=admin@escuelastop.com.ar ADMIN_PASSWORD=una-clave-segura \
   npm run seed:admin --workspace @escuelastop/backend
+# o dentro del contenedor:
+docker compose exec -e ADMIN_EMAIL=admin@escuelastop.com.ar \
+  -e ADMIN_PASSWORD='una-clave-segura' db \
+  psql -U stop -d escuelastop   # (o el seed compilado del backend)
 ```
 
 Luego ingresá en `http://localhost:3000/login`. En producción, definí un

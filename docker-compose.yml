@@ -49,6 +49,9 @@ services:
       FORM_BASE_URL: ${FORM_BASE_URL:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-cambiar-en-produccion}
       JWT_TTL_HOURS: ${JWT_TTL_HOURS:-12}
+      # Si se definen, el backend crea/actualiza este admin al arrancar.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
