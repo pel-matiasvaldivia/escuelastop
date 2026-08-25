@@ -52,6 +52,12 @@ export interface Course {
   /** Precio de referencia en ARS. null = "consultar". */
   price: number | null;
   priceNote?: string;
+  /**
+   * Monto de la seña (ARS) que debe pagarse para RESERVAR, ANTES de habilitar la
+   * elección de sucursal y turno. null = no se cobra seña online (se coordina con
+   * la sucursal).
+   */
+  seniaReserva?: number | null;
   description?: string;
   /** Contenido / qué incluye. */
   includes?: string[];
@@ -95,6 +101,7 @@ export const COURSES: Course[] = [
     priceNote:
       'El precio es en EFECTIVO. Para transferencia o tarjeta, consultar ' +
       'disponibilidad e intereses.',
+    seniaReserva: 50000, // CONFIRMAR monto de seña para reservar el curso particular
     description:
       'Curso para principiantes de licencia particular B1 (autos). Duración ' +
       'aprox. 5 a 6 semanas.',
@@ -135,6 +142,7 @@ export const COURSES: Course[] = [
       { id: 'reno-4', sucursal: 'Guaymallén', turno: 'Tarde', dias: 'Miércoles', horario: '15:00 a 20:00 hs' },
     ],
     reserva: RESERVA_PROFESIONAL,
+    seniaReserva: 50000,
     requiredFields: ['nombre', 'email', 'telefono', 'sucursal', 'turno', 'foto_licencia'],
     requiredDocs: ['Foto de la licencia de conducir (solo de frente)'],
     notes: ['Elegir un solo curso/turno del esquema.'],
@@ -154,6 +162,7 @@ export const COURSES: Course[] = [
       { id: 'amp-3', sucursal: 'Guaymallén', turno: 'Mañana', dias: 'Miércoles y Jueves', horario: '09:00 a 14:00 hs' },
     ],
     reserva: RESERVA_PROFESIONAL,
+    seniaReserva: 50000,
     requiredFields: ['nombre', 'email', 'telefono', 'sucursal', 'turno', 'foto_licencia'],
     requiredDocs: ['Foto de la licencia de conducir (solo de frente)'],
     notes: ['Elegir un solo curso/turno del esquema.'],

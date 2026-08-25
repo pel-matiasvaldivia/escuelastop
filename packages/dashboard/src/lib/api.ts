@@ -49,6 +49,7 @@ export interface Course {
   category: string;
   price: number | null;
   priceNote?: string;
+  seniaReserva?: number | null;
   description?: string;
   includes?: string[];
   schedules?: Schedule[];
@@ -70,6 +71,33 @@ export const api = {
   messages: (contactId: string) => get<Message[]>(`/contacts/${contactId}/messages`),
   catalog: () => get<Course[]>('/catalog'),
   enrollmentByToken: (token: string) => get<Enrollment>(`/public/enrollment/${token}`),
+
+  // --- Pago de la seña (gate) ---
+  async startPayment(token: string, courseId: string, contactId?: string, payerEmail?: string) {
+    const res = await fetch(`${API_URL}/api/public/enrollment/${token}/pay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ courseId, contactId, payerEmail }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error ?? 'Error iniciando el pago');
+    return res.json() as Promise<{ checkoutUrl: string; formToken: string }>;
+  },
+
+  async paymentStatus(token: string) {
+    return get<{ payment_status: 'pendiente' | 'aprobado' | 'rechazado' }>(
+      `/public/enrollment/${token}/payment-status`,
+    );
+  },
+
+  async saveSchedule(token: string, sede: string, notes: string) {
+    const res = await fetch(`${API_URL}/api/public/enrollment/${token}/schedule`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sede, notes }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo guardar el turno');
+    return res.json();
+  },
 
   async sendMessage(contactId: string, waId: string, body: string): Promise<void> {
     await fetch(`${API_URL}/api/contacts/${contactId}/messages`, {

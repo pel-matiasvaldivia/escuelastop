@@ -3,10 +3,14 @@ import { listContacts, updateContact } from '../services/contacts.js';
 import { getConversation, saveMessage } from '../services/messages.js';
 import {
   listEnrollments, updateEnrollment, getEnrollmentByToken, createEnrollment,
+  getEnrollmentById, setPaymentPending, applyPaymentStatus, saveScheduleAfterPayment,
   type EnrollmentStatus,
 } from '../services/enrollments.js';
 import type { MessagingChannel } from '../whatsapp/channel.js';
 import { COURSES, getCourse } from '../agent/catalog.js';
+import { paymentProvider } from '../payments/index.js';
+import { MockPaymentProvider } from '../payments/mock.js';
+import { config } from '../config.js';
 
 /**
  * Rutas REST que consume el dashboard de administración.
@@ -83,5 +87,115 @@ export function makeApiRouter(channel: MessagingChannel): Router {
     res.json(enrollment);
   });
 
+  // ==================== PAGO DE LA SEÑA (GATE) ====================
+  // El alumno debe pagar la seña ANTES de poder elegir sucursal y turno.
+
+  // 1) Iniciar el pago: crea la inscripción si no existe y devuelve la URL de checkout.
+  router.post('/public/enrollment/:token/pay', async (req, res) => {
+    const { contactId, courseId, payerEmail } = req.body as {
+      contactId?: string; courseId: string; payerEmail?: string;
+    };
+    const course = getCourse(courseId);
+    if (!course) {
+      res.status(400).json({ error: 'Curso inválido' });
+      return;
+    }
+    if (!course.seniaReserva) {
+      res.status(400).json({ error: 'Este curso se coordina con la sucursal (sin seña online).' });
+      return;
+    }
+
+    let enrollment = await getEnrollmentByToken(req.params.token);
+    if (!enrollment) {
+      if (!contactId) {
+        res.status(400).json({ error: 'Falta contactId para crear la inscripción' });
+        return;
+      }
+      enrollment = await createEnrollment(contactId, course.name);
+    }
+
+    const payment = await paymentProvider.createPayment({
+      enrollmentId: enrollment.id,
+      formToken: enrollment.form_token,
+      amount: course.seniaReserva,
+      description: `Seña de reserva — ${course.name}`,
+      payerEmail,
+    });
+    await setPaymentPending(enrollment.id, payment.paymentId, course.seniaReserva);
+    res.json({ checkoutUrl: payment.checkoutUrl, formToken: enrollment.form_token });
+  });
+
+  // 2) Consultar estado del pago (el formulario hace polling hasta 'aprobado').
+  router.get('/public/enrollment/:token/payment-status', async (req, res) => {
+    const enrollment = await getEnrollmentByToken(req.params.token);
+    if (!enrollment) {
+      res.status(404).json({ error: 'Inscripción no encontrada' });
+      return;
+    }
+    // Si sigue pendiente, reconsultamos al proveedor por las dudas (sin webhook).
+    if (enrollment.payment_status === 'pendiente' && enrollment.payment_id) {
+      const status = await paymentProvider.getStatus(enrollment.payment_id);
+      if (status !== 'pendiente') await applyPaymentStatus(enrollment.payment_id, status);
+      res.json({ payment_status: status });
+      return;
+    }
+    res.json({ payment_status: enrollment.payment_status });
+  });
+
+  // 3) Guardar sucursal/turno — SOLO si el pago está aprobado (gate en la query).
+  router.post('/public/enrollment/:token/schedule', async (req, res) => {
+    const { sede, notes } = req.body as { sede?: string; notes?: string };
+    const updated = await saveScheduleAfterPayment(
+      req.params.token, sede ?? null, notes ?? null,
+    );
+    if (!updated) {
+      res.status(402).json({ error: 'Pago no confirmado. Completá la seña para elegir turno.' });
+      return;
+    }
+    res.json(updated);
+  });
+
+  // Webhook de Mercado Pago: confirma el pago de forma asíncrona.
+  router.post('/webhooks/mercadopago', async (req, res) => {
+    try {
+      const parsed = await paymentProvider.parseWebhook(req.body);
+      if (parsed) await applyPaymentStatus(parsed.paymentId, parsed.status);
+    } catch (err) {
+      console.error('Error en webhook de Mercado Pago:', err);
+    }
+    res.sendStatus(200); // siempre 200 para que MP no reintente en loop
+  });
+
+  // Checkout SIMULADO (solo con PAYMENT_PROVIDER=mock). Aprueba el pago al confirmar.
+  router.get('/public/payments/mock/:paymentId', async (req, res) => {
+    if (!(paymentProvider instanceof MockPaymentProvider)) {
+      res.status(404).send('No disponible');
+      return;
+    }
+    const { paymentId } = req.params;
+    const { token, confirm } = req.query as { token?: string; confirm?: string };
+    if (confirm === '1') {
+      paymentProvider.setStatus(paymentId, 'aprobado');
+      await applyPaymentStatus(paymentId, 'aprobado');
+      res.send(htmlPage('✅ Pago aprobado', 'Ya podés volver al formulario y elegir tu turno.'));
+      return;
+    }
+    const confirmUrl =
+      `${config.publicBaseUrl}/api/public/payments/mock/${paymentId}?token=${token}&confirm=1`;
+    res.send(htmlPage(
+      'Checkout de prueba',
+      `<p>Este es un pago SIMULADO (modo desarrollo).</p>
+       <a href="${confirmUrl}" style="display:inline-block;padding:12px 20px;background:#16a34a;color:#fff;border-radius:8px;text-decoration:none">Simular pago aprobado</a>`,
+    ));
+  });
+
   return router;
+}
+
+function htmlPage(title: string, body: string): string {
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${title}</title></head>
+    <body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center">
+    <h2>${title}</h2>${body}</body></html>`;
 }

@@ -21,4 +21,11 @@ export const config = {
     sessionId: process.env.WA_SESSION_ID ?? 'escuelastop',
     headless: (process.env.WA_HEADLESS ?? 'true') === 'true',
   },
+  payments: {
+    // 'mercadopago' | 'mock' (mock aprueba al instante, solo para desarrollo)
+    provider: process.env.PAYMENT_PROVIDER ?? 'mock',
+    mercadopago: {
+      accessToken: process.env.MP_ACCESS_TOKEN ?? '',
+    },
+  },
 };

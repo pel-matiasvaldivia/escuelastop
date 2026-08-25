@@ -72,6 +72,11 @@ Implementado:
 - **Formulario de inscripción dinámico** (`/inscripcion/[token]`): los campos y
   documentos que se piden cambian según el curso elegido. Modo híbrido: llega
   prellenado con lo captado en el chat.
+- **Gate de pago de la seña**: el alumno debe pagar la seña ANTES de poder elegir
+  sucursal y turno (evita reservas de gente que después no se presenta). El pago
+  se hace con **Mercado Pago** (o un proveedor mock en desarrollo) y la selección
+  de turno se habilita solo cuando el pago está aprobado, validado también en el
+  backend (`saveScheduleAfterPayment`).
 - Persistencia de contactos, conversaciones e inscripciones.
 - API REST (incluye `/api/catalog`) y dashboard con bandeja de
   leads/inscripciones y chat para contacto directo.
@@ -81,8 +86,11 @@ Implementado:
 - [ ] **Autenticación** del dashboard (`admin_users`) — pendiente antes de producción.
 - [ ] **Extracción estructurada** de datos del chat (nombre, DNI, curso) con
       tool-use de Claude, para completar `contacts`/`enrollments` automáticamente.
-- [ ] **Guardado del formulario**: endpoint `POST /public/enrollment/:token` que
-      persista los valores y suba los adjuntos (foto de licencia/DNI).
+- [ ] **Persistir datos personales y adjuntos** del formulario (nombre, DNI, foto
+      de licencia/DNI) en el paso 1, no solo sucursal/turno.
+- [ ] **Firmar/validar el webhook de Mercado Pago** (x-signature) antes de producción.
+- [ ] Configurar **Mercado Pago real** (`PAYMENT_PROVIDER=mercadopago` + `MP_ACCESS_TOKEN`)
+      y confirmar el **monto de seña** de cada curso (hoy $50.000, a validar en Particular).
 - [ ] **Handoff a humano**: pausar el bot cuando un operador toma la conversación.
 - [ ] **Plantillas de WhatsApp** aprobadas por Meta para mensajes proactivos.
 - [ ] **Métricas** (leads por curso/sede, conversión) y exportación a Excel.

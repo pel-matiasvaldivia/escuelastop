@@ -45,10 +45,18 @@ CREATE TABLE IF NOT EXISTS enrollments (
               CHECK (status IN ('nuevo','contactado','inscripto','pagado','completado','cancelado')),
   form_token  UUID UNIQUE DEFAULT gen_random_uuid(), -- para el link de formulario prellenado
   notes       TEXT,
+  -- ---- Pago de la seña (GATE previo a elegir sucursal/turno) ----
+  -- La sucursal y el turno solo se guardan una vez que payment_status = 'aprobado'.
+  payment_status TEXT NOT NULL DEFAULT 'pendiente'
+                 CHECK (payment_status IN ('pendiente','aprobado','rechazado')),
+  payment_id     TEXT,        -- id del pago en el proveedor (Mercado Pago)
+  payment_amount INT,         -- monto de la seña en ARS
+  paid_at        TIMESTAMPTZ, -- momento en que se confirmó el pago
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_enrollments_status ON enrollments(status);
+CREATE INDEX IF NOT EXISTS idx_enrollments_payment ON enrollments(payment_status);
 
 -- ---------------------------------------------------------------------------
 -- Usuarios del dashboard (administración).

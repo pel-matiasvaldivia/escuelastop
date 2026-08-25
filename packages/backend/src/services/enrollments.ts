@@ -3,6 +3,8 @@ import { query } from '../db/index.js';
 export type EnrollmentStatus =
   | 'nuevo' | 'contactado' | 'inscripto' | 'pagado' | 'completado' | 'cancelado';
 
+export type PaymentStatus = 'pendiente' | 'aprobado' | 'rechazado';
+
 export interface Enrollment {
   id: string;
   contact_id: string;
@@ -11,6 +13,10 @@ export interface Enrollment {
   status: EnrollmentStatus;
   form_token: string;
   notes: string | null;
+  payment_status: PaymentStatus;
+  payment_id: string | null;
+  payment_amount: number | null;
+  paid_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +47,60 @@ export async function listEnrollments(status?: EnrollmentStatus): Promise<Enroll
 
 export async function getEnrollmentByToken(token: string): Promise<Enrollment | null> {
   const res = await query<Enrollment>('SELECT * FROM enrollments WHERE form_token = $1', [token]);
+  return res.rows[0] ?? null;
+}
+
+export async function getEnrollmentById(id: string): Promise<Enrollment | null> {
+  const res = await query<Enrollment>('SELECT * FROM enrollments WHERE id = $1', [id]);
+  return res.rows[0] ?? null;
+}
+
+/** Registra el intento de pago (id del proveedor + monto de la seña). */
+export async function setPaymentPending(
+  id: string, paymentId: string, amount: number,
+): Promise<Enrollment> {
+  const res = await query<Enrollment>(
+    `UPDATE enrollments
+     SET payment_id = $2, payment_amount = $3, payment_status = 'pendiente', updated_at = now()
+     WHERE id = $1 RETURNING *`,
+    [id, paymentId, amount],
+  );
+  return res.rows[0];
+}
+
+/**
+ * Confirma (o rechaza) el pago identificado por payment_id. Cuando se aprueba,
+ * marca paid_at y mueve el estado de la inscripción a 'pagado'. Este es el GATE:
+ * recién con payment_status = 'aprobado' el formulario habilita sucursal/turno.
+ */
+export async function applyPaymentStatus(
+  paymentId: string, status: PaymentStatus,
+): Promise<Enrollment | null> {
+  const res = await query<Enrollment>(
+    `UPDATE enrollments
+     SET payment_status = $2,
+         paid_at = CASE WHEN $2 = 'aprobado' THEN now() ELSE paid_at END,
+         status  = CASE WHEN $2 = 'aprobado' THEN 'pagado' ELSE status END,
+         updated_at = now()
+     WHERE payment_id = $1 RETURNING *`,
+    [paymentId, status],
+  );
+  return res.rows[0] ?? null;
+}
+
+/**
+ * Guarda sucursal/turno SOLO si el pago está aprobado. Devuelve null si el gate
+ * no está cumplido (pago pendiente/rechazado).
+ */
+export async function saveScheduleAfterPayment(
+  token: string, sede: string | null, notes: string | null,
+): Promise<Enrollment | null> {
+  const res = await query<Enrollment>(
+    `UPDATE enrollments
+     SET sede = $2, notes = COALESCE($3, notes), status = 'inscripto', updated_at = now()
+     WHERE form_token = $1 AND payment_status = 'aprobado' RETURNING *`,
+    [token, sede, notes],
+  );
   return res.rows[0] ?? null;
 }
 
