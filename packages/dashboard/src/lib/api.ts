@@ -20,6 +20,8 @@ export interface Enrollment {
   sede: string | null;
   status: string;
   notes: string | null;
+  license_expiry: string | null;
+  license_status: 'vigente' | 'proxima' | 'vencida' | null;
   payment_status: 'pendiente' | 'aprobado' | 'rechazado';
   payment_amount: number | null;
   paid_at: string | null;
@@ -82,7 +84,12 @@ export const api = {
       body: form,
     });
     if (!res.ok) throw new Error('No se pudieron guardar los datos');
-    return res.json();
+    return res.json() as Promise<{
+      ok: boolean;
+      licenseReview?: boolean;
+      licenseStatus?: 'vigente' | 'proxima' | 'vencida';
+      daysToExpiry?: number;
+    }>;
   },
 
   // --- Pago de la seña (gate) ---

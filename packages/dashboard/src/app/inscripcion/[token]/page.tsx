@@ -20,7 +20,7 @@ const FILE_FIELDS: FormFieldKey[] = ['foto_licencia', 'foto_dni', 'apto_medico']
 // Campos que dependen de haber pagado la seña (van DESPUÉS del gate de pago).
 const POST_PAYMENT_FIELDS: FormFieldKey[] = ['sucursal', 'turno'];
 
-type Step = 'datos' | 'pago' | 'turno' | 'listo';
+type Step = 'datos' | 'pago' | 'turno' | 'listo' | 'verificacion';
 
 /**
  * Formulario de inscripción con GATE DE PAGO.
@@ -35,6 +35,7 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<Record<string, File>>({});
   const [step, setStep] = useState<Step>('datos');
+  const [licenseInfo, setLicenseInfo] = useState<{ status: string; days: number } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -67,6 +68,7 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
   // Campos de datos personales (todo menos los que van después del pago).
   const preFields = (course?.requiredFields ?? []).filter((f) => !POST_PAYMENT_FIELDS.includes(f));
   const postFields = (course?.requiredFields ?? []).filter((f) => POST_PAYMENT_FIELDS.includes(f));
+  const needsLicense = (course?.requiredFields ?? []).includes('foto_licencia');
 
   function setField(key: string, value: string) {
     setValues((v) => ({ ...v, [key]: value }));
@@ -89,7 +91,17 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
       for (const k of FILE_FIELDS) {
         if (files[k]) fd.append(k, files[k]);
       }
-      await api.submitDetails(token, fd);
+      if (needsLicense && values.licenciaVencimiento) {
+        fd.append('licenciaVencimiento', values.licenciaVencimiento);
+      }
+      const resp = await api.submitDetails(token, fd);
+
+      // Licencia vencida o próxima a vencer → verificación humana, no avanza al pago.
+      if (resp?.licenseReview) {
+        setLicenseInfo({ status: resp.licenseStatus ?? 'vencida', days: resp.daysToExpiry ?? 0 });
+        setStep('verificacion');
+        return;
+      }
 
       if (!requiresPayment) { setStep('turno'); return; }
       const { checkoutUrl } = await api.startPayment(token, course.id, undefined, values.email);
@@ -164,6 +176,22 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
                 </p>
               )}
               {preFields.map((field) => renderField(field, values, setField, setFile))}
+              {needsLicense && (
+                <div>
+                  <label style={label}>Vencimiento de la licencia actual *</label>
+                  <input
+                    required
+                    type="date"
+                    value={values.licenciaVencimiento ?? ''}
+                    onChange={(e) => setField('licenciaVencimiento', e.target.value)}
+                    style={input}
+                  />
+                  <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                    La licencia debe estar vigente y con más de 90 días hasta su
+                    vencimiento para continuar online.
+                  </p>
+                </div>
+              )}
               <button type="submit" disabled={busy} style={submitBtn}>
                 {requiresPayment ? 'Continuar al pago de la seña →' : 'Continuar →'}
               </button>
@@ -197,6 +225,24 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
           )}
           <button type="submit" disabled={busy} style={submitBtn}>Confirmar inscripción</button>
         </form>
+      )}
+
+      {step === 'verificacion' && (
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ fontSize: 40 }}>🕒</div>
+          <h3>Tu trámite quedó pendiente de verificación</h3>
+          <p>
+            Detectamos que tu licencia está{' '}
+            <b>{licenseInfo?.status === 'vencida' ? 'vencida' : 'próxima a vencer'}</b>
+            {typeof licenseInfo?.days === 'number' && licenseInfo.status === 'proxima' &&
+              ` (vence en ${licenseInfo.days} días)`}.
+          </p>
+          <p>
+            Por eso no podés continuar con el pago online. <b>Administración va a
+            revisar tu caso</b> y te va a contactar por WhatsApp para indicarte cómo
+            seguir.
+          </p>
+        </div>
       )}
 
       {step === 'listo' && (

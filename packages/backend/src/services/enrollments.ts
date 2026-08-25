@@ -13,6 +13,8 @@ export interface Enrollment {
   status: EnrollmentStatus;
   form_token: string;
   notes: string | null;
+  license_expiry: string | null;
+  license_status: 'vigente' | 'proxima' | 'vencida' | null;
   payment_status: PaymentStatus;
   payment_id: string | null;
   payment_amount: number | null;
@@ -53,6 +55,31 @@ export async function getEnrollmentByToken(token: string): Promise<Enrollment | 
 export async function getEnrollmentById(id: string): Promise<Enrollment | null> {
   const res = await query<Enrollment>('SELECT * FROM enrollments WHERE id = $1', [id]);
   return res.rows[0] ?? null;
+}
+
+/**
+ * Guarda la evaluación de la licencia. Si requiere verificación humana, deja la
+ * inscripción en 'pendiente_verificacion' para que administración tome el caso.
+ */
+export async function setLicenseInfo(
+  id: string,
+  expiry: string,
+  licenseStatus: 'vigente' | 'proxima' | 'vencida',
+  needsReview: boolean,
+  note?: string,
+): Promise<Enrollment> {
+  const res = await query<Enrollment>(
+    `UPDATE enrollments
+     SET license_expiry = $2,
+         license_status = $3,
+         status = CASE WHEN $4 THEN 'pendiente_verificacion' ELSE status END,
+         notes = CASE WHEN $5::text IS NOT NULL
+                      THEN COALESCE(notes || E'\\n', '') || $5 ELSE notes END,
+         updated_at = now()
+     WHERE id = $1 RETURNING *`,
+    [id, expiry, licenseStatus, needsReview, note ?? null],
+  );
+  return res.rows[0];
 }
 
 /** Registra el intento de pago (id del proveedor + monto de la seña). */

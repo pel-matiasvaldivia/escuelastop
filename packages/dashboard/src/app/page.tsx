@@ -84,6 +84,7 @@ function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     nuevo: '#64748b', contactado: '#0891b2', inscripto: '#7c3aed',
     pagado: '#16a34a', completado: '#15803d', cancelado: '#dc2626',
+    pendiente_verificacion: '#ea580c',
   };
   return (
     <span style={{

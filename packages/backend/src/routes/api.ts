@@ -8,8 +8,10 @@ import { getConversation, saveMessage } from '../services/messages.js';
 import {
   listEnrollments, updateEnrollment, getEnrollmentByToken, createEnrollment,
   getEnrollmentById, setPaymentPending, applyPaymentStatus, saveScheduleAfterPayment,
-  type EnrollmentStatus,
+  setLicenseInfo, type EnrollmentStatus,
 } from '../services/enrollments.js';
+import { evaluateLicense } from '../services/license.js';
+import { extractLicenseExpiry } from '../agent/vision.js';
 import type { MessagingChannel } from '../whatsapp/channel.js';
 import { COURSES, getCourse } from '../agent/catalog.js';
 import { paymentProvider } from '../payments/index.js';
@@ -126,7 +128,48 @@ export function makeApiRouter(channel: MessagingChannel): Router {
         const f = files[kind]?.[0];
         if (f) await saveDocument(enrollment.id, kind, f.path, f.mimetype);
       }
-      res.json({ ok: true });
+
+      // ---- Verificación de la licencia (cursos profesionales) ----
+      // Si se declara vencimiento, se evalúa la regla de 90 días. Si está vencida
+      // o próxima a vencer, el trámite queda 'pendiente_verificacion' y NO avanza
+      // al pago: administración toma el caso.
+      const { licenciaVencimiento } = req.body as { licenciaVencimiento?: string };
+      if (licenciaVencimiento) {
+        const expiry = new Date(licenciaVencimiento);
+        if (Number.isNaN(expiry.getTime())) {
+          res.status(400).json({ error: 'Fecha de vencimiento de licencia inválida' });
+          return;
+        }
+        const evalResult = evaluateLicense(expiry);
+
+        // Cotejo anti-fraude con Claude vision (best-effort, no bloquea el flujo).
+        let note: string | undefined;
+        const licFile = files['foto_licencia']?.[0];
+        if (licFile) {
+          const detected = await extractLicenseExpiry(licFile.path, licFile.mimetype);
+          if (detected && detected !== licenciaVencimiento) {
+            note = `⚠️ Verificar: vencimiento declarado ${licenciaVencimiento} ` +
+              `≠ leído de la foto ${detected}.`;
+          }
+        }
+
+        await setLicenseInfo(
+          enrollment.id, licenciaVencimiento, evalResult.status,
+          evalResult.needsHumanReview, note,
+        );
+
+        if (evalResult.needsHumanReview) {
+          res.json({
+            ok: true,
+            licenseReview: true,
+            licenseStatus: evalResult.status,
+            daysToExpiry: evalResult.daysToExpiry,
+          });
+          return;
+        }
+      }
+
+      res.json({ ok: true, licenseReview: false });
     },
   );
 

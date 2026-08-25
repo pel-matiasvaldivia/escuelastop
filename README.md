@@ -76,6 +76,12 @@ Implementado:
   documentos que se piden cambian según el curso elegido. Es donde el alumno
   carga todos sus datos y **sube las fotos de DNI/licencia** (persistidas en la
   tabla `documents` vía subida multipart).
+- **Verificación de vigencia de la licencia**: en los cursos que requieren
+  licencia, el formulario pide la fecha de vencimiento y aplica la regla de 90
+  días (`services/license.ts`). Si está **vencida o próxima a vencer (≤ 90 días)**,
+  el trámite NO avanza al pago: queda en estado `pendiente_verificacion` y
+  administración lo toma. Además, si hay API key, se usa **Claude vision** para
+  leer la fecha en la foto y cotejarla con la declarada (nota anti-fraude).
 - **Gate de pago de la seña**: el alumno debe pagar la seña ANTES de poder elegir
   sucursal y turno (evita reservas de gente que después no se presenta). El pago
   se hace con **Mercado Pago** (o un proveedor mock en desarrollo) y la selección

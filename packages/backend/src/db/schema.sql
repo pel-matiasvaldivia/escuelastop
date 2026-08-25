@@ -43,9 +43,13 @@ CREATE TABLE IF NOT EXISTS enrollments (
   course      TEXT,                            -- p.ej. "Licencia particular B1"
   sede        TEXT,
   status      TEXT NOT NULL DEFAULT 'nuevo'
-              CHECK (status IN ('nuevo','contactado','inscripto','pagado','completado','cancelado')),
+              CHECK (status IN ('nuevo','contactado','inscripto','pagado','completado',
+                                'cancelado','pendiente_verificacion')),
   form_token  UUID UNIQUE DEFAULT gen_random_uuid(), -- para el link de formulario prellenado
   notes       TEXT,
+  -- ---- Verificación de la licencia (para cursos profesionales) ----
+  license_expiry DATE,          -- fecha de vencimiento declarada de la licencia
+  license_status TEXT CHECK (license_status IN ('vigente','proxima','vencida')),
   -- ---- Pago de la seña (GATE previo a elegir sucursal/turno) ----
   -- La sucursal y el turno solo se guardan una vez que payment_status = 'aprobado'.
   payment_status TEXT NOT NULL DEFAULT 'pendiente'
