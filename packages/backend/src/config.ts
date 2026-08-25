@@ -22,6 +22,11 @@ export const config = {
   whatsapp: {
     sessionId: process.env.WA_SESSION_ID ?? 'escuelastop',
     headless: (process.env.WA_HEADLESS ?? 'true') === 'true',
+    // Ruta a Chromium (en Docker se instala por apt); si no se define, open-wa
+    // usa el navegador que descarga puppeteer.
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    // true dentro de contenedores (sin sandbox de Chromium).
+    docker: (process.env.WA_DOCKER ?? 'false') === 'true',
   },
   payments: {
     // 'mercadopago' | 'mock' (mock aprueba al instante, solo para desarrollo)

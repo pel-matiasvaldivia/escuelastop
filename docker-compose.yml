@@ -1,16 +1,77 @@
+# Stack completo de la app: Postgres + backend (API/agente/WhatsApp) + dashboard.
+#
+# Uso:
+#   cp .env.example .env    # completar ANTHROPIC_API_KEY, JWT_SECRET, etc.
+#   docker compose up -d --build
+#   # crear el usuario admin del dashboard:
+#   docker compose exec backend npm run seed:admin
+#
+# Las imágenes se construyen desde los Dockerfiles del repo. También podés usar
+# las imágenes publicadas en GHCR fijando REGISTRY/IMAGE_TAG (ver abajo).
+
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: stop
-      POSTGRES_PASSWORD: stop
-      POSTGRES_DB: escuelastop
+      POSTGRES_USER: ${POSTGRES_USER:-stop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stop}
+      POSTGRES_DB: ${POSTGRES_DB:-escuelastop}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./packages/backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stop} -d ${POSTGRES_DB:-escuelastop}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ${REGISTRY:-ghcr.io/pel-matiasvaldivia/escuelastop}-backend:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stop}:${POSTGRES_PASSWORD:-stop}@db:5432/${POSTGRES_DB:-escuelastop}
+      DASHBOARD_ORIGIN: ${DASHBOARD_ORIGIN:-http://localhost:3000}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3001}
+      FORM_BASE_URL: ${FORM_BASE_URL:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-cambiar-en-produccion}
+      JWT_TTL_HOURS: ${JWT_TTL_HOURS:-12}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      WA_SESSION_ID: ${WA_SESSION_ID:-escuelastop}
+      WA_HEADLESS: ${WA_HEADLESS:-true}
+    ports:
+      - "3001:3001"
+    volumes:
+      - uploads:/app/packages/backend/uploads
+      - wa_session:/app/packages/backend/whatsapp-session
+
+  dashboard:
+    image: ${REGISTRY:-ghcr.io/pel-matiasvaldivia/escuelastop}-dashboard:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: packages/dashboard/Dockerfile
+      args:
+        # URL del backend accesible DESDE EL NAVEGADOR (no un hostname interno).
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
 
 volumes:
   pgdata:
+  uploads:
+  wa_session:

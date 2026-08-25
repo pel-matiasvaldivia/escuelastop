@@ -1,0 +1,32 @@
+# deps y builds (se instalan/generan dentro de la imagen)
+node_modules
+packages/*/node_modules
+dist
+packages/*/dist
+.next
+packages/*/.next
+
+# secretos y datos locales
+.env
+.env.local
+packages/*/.env
+packages/*/.env.local
+uploads
+packages/*/uploads
+whatsapp-session
+packages/*/whatsapp-session
+
+# sesión de open-wa
+_IGNORE_*
+**.data.json
+tokens
+.wwebjs_auth
+
+# git / ci / editor
+.git
+.github
+.gitignore
+*.log
+.DS_Store
+coverage
+README.md

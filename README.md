@@ -95,6 +95,44 @@ Implementado:
   administración de la API requieren `Authorization: Bearer <token>`; las rutas
   públicas del formulario del alumno y los webhooks quedan abiertas.
 
+## Despliegue con Docker
+
+El repo incluye un stack completo (`docker-compose.yml`): Postgres + backend
+(API/agente/WhatsApp) + dashboard.
+
+```bash
+cp .env.example .env          # completar ANTHROPIC_API_KEY, JWT_SECRET, etc.
+docker compose up -d --build  # construye y levanta los 3 servicios
+docker compose exec backend npm run seed:admin   # crea el usuario admin
+```
+
+- Dashboard: http://localhost:3000 · API: http://localhost:3001 · Postgres: 5432
+- Los documentos subidos y la sesión de WhatsApp se persisten en volúmenes
+  (`uploads`, `wa_session`).
+- `NEXT_PUBLIC_API_URL` se hornea en el build del dashboard: debe ser una URL
+  del backend **alcanzable desde el navegador** del operador.
+
+> ⚠️ **WhatsApp en Docker:** la imagen del backend incluye Chromium y corre
+> open-wa con `--no-sandbox`. La primera vinculación necesita escanear el QR
+> (mirá los logs con `docker compose logs -f backend`) y la sesión queda
+> persistida en el volumen `wa_session`. Para producción a escala, migrar a la
+> Meta Cloud API.
+
+### Imágenes en GHCR
+
+El workflow `.github/workflows/docker-publish.yml` construye y publica las
+imágenes en el GitHub Container Registry en cada push a `main` y en cada tag
+`vX.Y.Z`:
+
+- `ghcr.io/<owner>/<repo>-backend`
+- `ghcr.io/<owner>/<repo>-dashboard`
+
+Para usar las imágenes publicadas en vez de construir localmente, fijá
+`IMAGE_TAG` (y opcionalmente `REGISTRY`) al correr `docker compose up -d`.
+La URL pública del backend para el build del dashboard se toma de la variable
+de repositorio `NEXT_PUBLIC_API_URL` (Settings → Secrets and variables →
+Actions → Variables).
+
 ## Autenticación del dashboard
 
 Las rutas del panel están protegidas. Antes de ingresar hay que crear el
@@ -112,6 +150,8 @@ Luego ingresá en `http://localhost:3000/login`. En producción, definí un
 ## Roadmap (próximos pasos)
 
 - [x] **Autenticación** del dashboard (`admin_users`).
+- [x] **Empaquetado Docker** (compose con db + backend + dashboard) y **CI** que
+      publica imágenes en GHCR.
 - [ ] **Extracción estructurada** de datos del chat (nombre, DNI, curso) con
       tool-use de Claude, para completar `contacts`/`enrollments` automáticamente.
 - [ ] **Ver los documentos en el dashboard** (ya existe `GET /enrollments/:id/documents`
