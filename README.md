@@ -98,19 +98,29 @@ Implementado:
 ## Despliegue con Docker
 
 El repo incluye un stack completo (`docker-compose.yml`): Postgres + backend
-(API/agente/WhatsApp) + dashboard.
+(API/agente/WhatsApp) + dashboard. **Por defecto tira de las imágenes publicadas
+en GHCR** (el workflow las construye en cada push a `main`):
 
 ```bash
 cp .env.example .env          # completar ANTHROPIC_API_KEY, JWT_SECRET, etc.
-docker compose up -d --build  # construye y levanta los 3 servicios
+docker login ghcr.io -u <usuario>   # si los packages son privados (PAT read:packages)
+docker compose pull           # baja las imágenes de GHCR
+docker compose up -d          # levanta los 3 servicios
 docker compose exec backend npm run seed:admin   # crea el usuario admin
+```
+
+Para **construir localmente** en vez de usar GHCR:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
 - Dashboard: http://localhost:3000 · API: http://localhost:3001 · Postgres: 5432
 - Los documentos subidos y la sesión de WhatsApp se persisten en volúmenes
   (`uploads`, `wa_session`).
 - `NEXT_PUBLIC_API_URL` se hornea en el build del dashboard: debe ser una URL
-  del backend **alcanzable desde el navegador** del operador.
+  del backend **alcanzable desde el navegador** del operador. En las imágenes de
+  GHCR se toma de la variable de repositorio `NEXT_PUBLIC_API_URL`.
 
 > ⚠️ **WhatsApp en Docker:** la imagen del backend incluye Chromium y corre
 > open-wa con `--no-sandbox`. La primera vinculación necesita escanear el QR
@@ -127,11 +137,11 @@ imágenes en el GitHub Container Registry en cada push a `main` y en cada tag
 - `ghcr.io/<owner>/<repo>-backend`
 - `ghcr.io/<owner>/<repo>-dashboard`
 
-Para usar las imágenes publicadas en vez de construir localmente, fijá
-`IMAGE_TAG` (y opcionalmente `REGISTRY`) al correr `docker compose up -d`.
-La URL pública del backend para el build del dashboard se toma de la variable
-de repositorio `NEXT_PUBLIC_API_URL` (Settings → Secrets and variables →
-Actions → Variables).
+El `docker-compose.yml` ya apunta a estas imágenes (`pull_policy: always`). Podés
+fijar una versión concreta con `IMAGE_TAG` (por defecto `latest`) y sobreescribir
+el registro con `REGISTRY`. La URL pública del backend para el build del dashboard
+se toma de la variable de repositorio `NEXT_PUBLIC_API_URL` (Settings → Secrets
+and variables → Actions → Variables); cambiarla requiere re-correr el workflow.
 
 ## Autenticación del dashboard
 

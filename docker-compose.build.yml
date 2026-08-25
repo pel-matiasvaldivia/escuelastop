@@ -1,0 +1,22 @@
+# Override OPCIONAL para construir las imágenes localmente en vez de tirar de GHCR.
+#
+# Uso (combinado con el compose base):
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# NEXT_PUBLIC_API_URL se hornea en el build del dashboard: debe ser la URL del
+# backend accesible DESDE EL NAVEGADOR del operador.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    pull_policy: build
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: packages/dashboard/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+    pull_policy: build
