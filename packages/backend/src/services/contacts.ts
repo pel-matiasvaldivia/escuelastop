@@ -5,6 +5,7 @@ export interface Contact {
   wa_id: string;
   phone: string | null;
   full_name: string | null;
+  email: string | null;
   dni: string | null;
   age: number | null;
   preferred_sede: string | null;
@@ -33,7 +34,7 @@ export async function listContacts(): Promise<Contact[]> {
 
 export async function updateContact(id: string, fields: Partial<Contact>): Promise<Contact> {
   const allowed: (keyof Contact)[] = [
-    'phone', 'full_name', 'dni', 'age', 'preferred_sede', 'interest', 'consent_given',
+    'phone', 'full_name', 'email', 'dni', 'age', 'preferred_sede', 'interest', 'consent_given',
   ];
   const sets: string[] = [];
   const values: unknown[] = [];

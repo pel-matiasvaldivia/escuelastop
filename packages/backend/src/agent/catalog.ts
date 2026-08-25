@@ -101,7 +101,7 @@ export const COURSES: Course[] = [
     priceNote:
       'El precio es en EFECTIVO. Para transferencia o tarjeta, consultar ' +
       'disponibilidad e intereses.',
-    seniaReserva: 50000, // CONFIRMAR monto de seña para reservar el curso particular
+    seniaReserva: 50000, // Seña de reserva: $50.000 para todo concepto
     description:
       'Curso para principiantes de licencia particular B1 (autos). Duración ' +
       'aprox. 5 a 6 semanas.',

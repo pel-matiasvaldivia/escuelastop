@@ -18,7 +18,7 @@ export function makeConversationHandler(channel: MessagingChannel) {
       await saveMessage(contact.id, 'inbound', 'user', msg.body);
 
       const history = await getChatHistory(contact.id);
-      const reply = await generateReply(history);
+      const reply = await generateReply(history, contact.id);
 
       await saveMessage(contact.id, 'outbound', 'bot', reply);
       await channel.sendText(msg.waId, reply);

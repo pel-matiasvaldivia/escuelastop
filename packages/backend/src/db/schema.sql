@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   wa_id         TEXT UNIQUE NOT NULL,          -- número en formato open-wa (54911...@c.us)
   phone         TEXT,                          -- número normalizado +54...
   full_name     TEXT,
+  email         TEXT,
   dni           TEXT,
   age           INT,
   preferred_sede TEXT,
@@ -57,6 +58,20 @@ CREATE TABLE IF NOT EXISTS enrollments (
 );
 CREATE INDEX IF NOT EXISTS idx_enrollments_status ON enrollments(status);
 CREATE INDEX IF NOT EXISTS idx_enrollments_payment ON enrollments(payment_status);
+
+-- ---------------------------------------------------------------------------
+-- Documentos adjuntos (foto de licencia, foto de DNI, apto médico).
+-- Los sube el ALUMNO desde el formulario; el agente de WhatsApp no los pide.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS documents (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  enrollment_id UUID NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+  kind          TEXT NOT NULL CHECK (kind IN ('foto_licencia','foto_dni','apto_medico')),
+  file_path     TEXT NOT NULL,   -- ruta en disco (o key de almacenamiento)
+  mime_type     TEXT,
+  uploaded_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_documents_enrollment ON documents(enrollment_id);
 
 -- ---------------------------------------------------------------------------
 -- Usuarios del dashboard (administración).

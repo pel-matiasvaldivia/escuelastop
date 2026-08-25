@@ -1,4 +1,4 @@
-import { create, Client, Message as WaMessage } from '@open-wa/wa-automate';
+import { create, Client, Message as WaMessage, ChatId } from '@open-wa/wa-automate';
 import { config } from '../config.js';
 import type { MessagingChannel, MessageHandler } from './channel.js';
 
@@ -39,6 +39,6 @@ export class OpenWaChannel implements MessagingChannel {
 
   async sendText(waId: string, text: string): Promise<void> {
     if (!this.client) throw new Error('El canal de WhatsApp no está iniciado');
-    await this.client.sendText(waId, text);
+    await this.client.sendText(waId as ChatId, text);
   }
 }

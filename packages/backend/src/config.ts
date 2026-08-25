@@ -13,6 +13,8 @@ export const config = {
   databaseUrl: required('DATABASE_URL', 'postgresql://stop:stop@localhost:5432/escuelastop'),
   dashboardOrigin: process.env.DASHBOARD_ORIGIN ?? 'http://localhost:3000',
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? 'http://localhost:3001',
+  // Base pública del formulario de inscripción (el agente arma el link con esto).
+  formBaseUrl: process.env.FORM_BASE_URL ?? process.env.DASHBOARD_ORIGIN ?? 'http://localhost:3000',
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY ?? '',
     model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5',

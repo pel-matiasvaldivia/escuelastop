@@ -33,6 +33,7 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<Record<string, File>>({});
   const [step, setStep] = useState<Step>('datos');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,14 +71,27 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
   function setField(key: string, value: string) {
     setValues((v) => ({ ...v, [key]: value }));
   }
+  function setFile(key: string, file: File) {
+    setFiles((f) => ({ ...f, [key]: file }));
+  }
 
-  // Paso 1 → iniciar pago (o, si no hay seña, saltar directo a "turno"/coordinación).
+  // Paso 1 → guardar datos + fotos, luego iniciar pago (o saltar si no hay seña).
   async function submitDatos(e: React.FormEvent) {
     e.preventDefault();
     if (!course) return;
-    if (!requiresPayment) { setStep('turno'); return; }
     setBusy(true);
     try {
+      // Guardar datos personales y adjuntos (los gestiona el formulario).
+      const fd = new FormData();
+      for (const k of ['nombre', 'dni', 'edad', 'email', 'telefono']) {
+        if (values[k]) fd.append(k, values[k]);
+      }
+      for (const k of FILE_FIELDS) {
+        if (files[k]) fd.append(k, files[k]);
+      }
+      await api.submitDetails(token, fd);
+
+      if (!requiresPayment) { setStep('turno'); return; }
       const { checkoutUrl } = await api.startPayment(token, course.id, undefined, values.email);
       setStep('pago');
       // Abrimos el checkout en otra pestaña y empezamos a chequear el estado.
@@ -149,7 +163,7 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
                   vas a poder elegir <b>sucursal y turno</b>.
                 </p>
               )}
-              {preFields.map((field) => renderField(field, values, setField))}
+              {preFields.map((field) => renderField(field, values, setField, setFile))}
               <button type="submit" disabled={busy} style={submitBtn}>
                 {requiresPayment ? 'Continuar al pago de la seña →' : 'Continuar →'}
               </button>
@@ -177,7 +191,7 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
             <p style={{ ...note, background: '#dcfce7' }}>✅ Seña confirmada. Elegí tu turno.</p>
           )}
           {(postFields.length ? postFields : (['sucursal'] as FormFieldKey[]))
-            .map((field) => renderField(field, values, setField, course))}
+            .map((field) => renderField(field, values, setField, setFile, course))}
           {course.contactSucursal && (
             <p style={note}>⚠️ Esta modalidad se coordina con la sucursal. Te vamos a contactar.</p>
           )}
@@ -200,6 +214,7 @@ function renderField(
   field: FormFieldKey,
   values: Record<string, string>,
   setField: (k: string, v: string) => void,
+  setFile: (k: string, file: File) => void,
   course?: Course,
 ) {
   if (field === 'turno' && course?.schedules?.length) {
@@ -238,7 +253,11 @@ function renderField(
         type={isFile ? 'file' : field === 'email' ? 'email' : field === 'edad' ? 'number' : 'text'}
         accept={isFile ? 'image/*' : undefined}
         value={isFile ? undefined : values[field] ?? ''}
-        onChange={(e) => setField(field, e.target.value)}
+        onChange={(e) =>
+          isFile
+            ? e.target.files?.[0] && setFile(field, e.target.files[0])
+            : setField(field, e.target.value)
+        }
         style={input}
       />
     </div>

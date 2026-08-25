@@ -68,10 +68,14 @@ Implementado:
   verdad: Particular B1, Profesional Renovación/Ampliación, Solo Prácticas,
   Avanzado, Teoría sola y Alquiler del auto (con turnos, precios, cuotas, seña,
   documentos y campos de formulario requeridos por curso).
-- Agente Claude cuya base de conocimiento se **genera a partir del catálogo**.
+- Agente Claude cuya base de conocimiento se **genera a partir del catálogo** y
+  que, mediante **tool-use**, crea la inscripción y le envía a la persona el
+  **link del formulario** cuando quiere avanzar. El agente NO pide datos ni fotos
+  por el chat: solo responde requisitos y deriva al formulario.
 - **Formulario de inscripción dinámico** (`/inscripcion/[token]`): los campos y
-  documentos que se piden cambian según el curso elegido. Modo híbrido: llega
-  prellenado con lo captado en el chat.
+  documentos que se piden cambian según el curso elegido. Es donde el alumno
+  carga todos sus datos y **sube las fotos de DNI/licencia** (persistidas en la
+  tabla `documents` vía subida multipart).
 - **Gate de pago de la seña**: el alumno debe pagar la seña ANTES de poder elegir
   sucursal y turno (evita reservas de gente que después no se presenta). El pago
   se hace con **Mercado Pago** (o un proveedor mock en desarrollo) y la selección
@@ -86,9 +90,11 @@ Implementado:
 - [ ] **Autenticación** del dashboard (`admin_users`) — pendiente antes de producción.
 - [ ] **Extracción estructurada** de datos del chat (nombre, DNI, curso) con
       tool-use de Claude, para completar `contacts`/`enrollments` automáticamente.
-- [ ] **Persistir datos personales y adjuntos** del formulario (nombre, DNI, foto
-      de licencia/DNI) en el paso 1, no solo sucursal/turno.
+- [ ] **Ver los documentos en el dashboard** (ya existe `GET /enrollments/:id/documents`
+      y `GET /documents/:id/file`; falta la UI en la ficha del alumno).
 - [ ] **Firmar/validar el webhook de Mercado Pago** (x-signature) antes de producción.
+- [ ] **Almacenamiento de archivos**: hoy en disco local (`uploads/`); para
+      producción usar S3/almacenamiento gestionado con URLs firmadas.
 - [ ] Configurar **Mercado Pago real** (`PAYMENT_PROVIDER=mercadopago` + `MP_ACCESS_TOKEN`)
       y confirmar el **monto de seña** de cada curso (hoy $50.000, a validar en Particular).
 - [ ] **Handoff a humano**: pausar el bot cuando un operador toma la conversación.

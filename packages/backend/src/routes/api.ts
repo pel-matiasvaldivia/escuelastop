@@ -1,5 +1,9 @@
 import { Router } from 'express';
+import multer from 'multer';
+import { existsSync, mkdirSync } from 'node:fs';
+import { extname } from 'node:path';
 import { listContacts, updateContact } from '../services/contacts.js';
+import { saveDocument, listDocuments, getDocument, type DocumentKind } from '../services/documents.js';
 import { getConversation, saveMessage } from '../services/messages.js';
 import {
   listEnrollments, updateEnrollment, getEnrollmentByToken, createEnrollment,
@@ -16,6 +20,17 @@ import { config } from '../config.js';
  * Rutas REST que consume el dashboard de administración.
  * TODO (Fase 5): proteger con autenticación (admin_users) antes de producción.
  */
+const UPLOAD_DIR = './uploads';
+if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOAD_DIR,
+    filename: (_req, file, cb) => cb(null, `${Date.now()}_${file.fieldname}${extname(file.originalname)}`),
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB por archivo
+});
+const DOC_FIELDS: DocumentKind[] = ['foto_licencia', 'foto_dni', 'apto_medico'];
+
 export function makeApiRouter(channel: MessagingChannel): Router {
   const router = Router();
 
@@ -85,6 +100,49 @@ export function makeApiRouter(channel: MessagingChannel): Router {
       return;
     }
     res.json(enrollment);
+  });
+
+  // 1er paso del formulario: datos personales + fotos (DNI/licencia).
+  // multipart/form-data. Las fotos las gestiona el FORMULARIO, no el agente.
+  router.post(
+    '/public/enrollment/:token/details',
+    upload.fields(DOC_FIELDS.map((name) => ({ name, maxCount: 1 }))),
+    async (req, res) => {
+      const enrollment = await getEnrollmentByToken(req.params.token);
+      if (!enrollment) {
+        res.status(404).json({ error: 'Inscripción no encontrada' });
+        return;
+      }
+      const { nombre, email, dni, edad, telefono } = req.body as Record<string, string>;
+      await updateContact(enrollment.contact_id, {
+        full_name: nombre, email, dni,
+        age: edad ? Number(edad) : undefined,
+        phone: telefono,
+      });
+
+      // Guardar los archivos subidos.
+      const files = (req.files ?? {}) as Record<string, Express.Multer.File[]>;
+      for (const kind of DOC_FIELDS) {
+        const f = files[kind]?.[0];
+        if (f) await saveDocument(enrollment.id, kind, f.path, f.mimetype);
+      }
+      res.json({ ok: true });
+    },
+  );
+
+  // Documentos de una inscripción (dashboard).
+  router.get('/enrollments/:id/documents', async (req, res) => {
+    res.json(await listDocuments(req.params.id));
+  });
+
+  // Servir un documento adjunto (dashboard). TODO: proteger con auth.
+  router.get('/documents/:id/file', async (req, res) => {
+    const doc = await getDocument(req.params.id);
+    if (!doc) {
+      res.status(404).send('No encontrado');
+      return;
+    }
+    res.sendFile(doc.file_path, { root: process.cwd() });
   });
 
   // ==================== PAGO DE LA SEÑA (GATE) ====================

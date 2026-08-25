@@ -20,6 +20,9 @@ export interface Enrollment {
   sede: string | null;
   status: string;
   notes: string | null;
+  payment_status: 'pendiente' | 'aprobado' | 'rechazado';
+  payment_amount: number | null;
+  paid_at: string | null;
   updated_at: string;
 }
 
@@ -71,6 +74,16 @@ export const api = {
   messages: (contactId: string) => get<Message[]>(`/contacts/${contactId}/messages`),
   catalog: () => get<Course[]>('/catalog'),
   enrollmentByToken: (token: string) => get<Enrollment>(`/public/enrollment/${token}`),
+
+  // --- Paso 1: datos personales + fotos (multipart) ---
+  async submitDetails(token: string, form: FormData) {
+    const res = await fetch(`${API_URL}/api/public/enrollment/${token}/details`, {
+      method: 'POST',
+      body: form,
+    });
+    if (!res.ok) throw new Error('No se pudieron guardar los datos');
+    return res.json();
+  },
 
   // --- Pago de la seña (gate) ---
   async startPayment(token: string, courseId: string, contactId?: string, payerEmail?: string) {
