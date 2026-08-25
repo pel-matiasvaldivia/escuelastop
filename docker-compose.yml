@@ -56,6 +56,13 @@ services:
     volumes:
       - uploads:/app/packages/backend/uploads
       - wa_session:/app/packages/backend/whatsapp-session
+    healthcheck:
+      # Usa el endpoint /health de la API (la imagen no trae curl/wget).
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
   dashboard:
     image: ${REGISTRY:-ghcr.io/pel-matiasvaldivia/escuelastop}-dashboard:${IMAGE_TAG:-latest}
@@ -67,7 +74,8 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "3000:3000"
 
