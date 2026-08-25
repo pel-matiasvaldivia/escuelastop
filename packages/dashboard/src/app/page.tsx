@@ -1,21 +1,43 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api } from '../lib/api';
+import { api, auth, UnauthorizedError, type Contact, type Enrollment } from '../lib/api';
 
 // Panel principal: bandeja de inscripciones + leads recientes.
-export default async function HomePage() {
-  let enrollments: Awaited<ReturnType<typeof api.enrollments>> = [];
-  let contacts: Awaited<ReturnType<typeof api.contacts>> = [];
-  let error: string | null = null;
+export default function HomePage() {
+  const router = useRouter();
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  try {
-    [enrollments, contacts] = await Promise.all([api.enrollments(), api.contacts()]);
-  } catch (e) {
-    error = 'No se pudo conectar con la API. ¿Está corriendo el backend?';
-  }
+  useEffect(() => {
+    if (!auth.isAuthenticated()) {
+      router.replace('/login');
+      return;
+    }
+    (async () => {
+      try {
+        const [e, c] = await Promise.all([api.enrollments(), api.contacts()]);
+        setEnrollments(e);
+        setContacts(c);
+      } catch (err) {
+        if (err instanceof UnauthorizedError) {
+          router.replace('/login');
+          return;
+        }
+        setError('No se pudo conectar con la API. ¿Está corriendo el backend?');
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  if (error) {
-    return <p style={{ color: '#b91c1c' }}>{error}</p>;
-  }
+  if (loading) return <p style={{ color: '#64748b' }}>Cargando…</p>;
+  if (error) return <p style={{ color: '#b91c1c' }}>{error}</p>;
 
   return (
     <div style={{ display: 'grid', gap: 32 }}>

@@ -90,10 +90,28 @@ Implementado:
 - Persistencia de contactos, conversaciones e inscripciones.
 - API REST (incluye `/api/catalog`) y dashboard con bandeja de
   leads/inscripciones y chat para contacto directo.
+- **Autenticación del dashboard** (`admin_users`): login con email/contraseña,
+  contraseñas con scrypt y sesión por token JWT (HS256). Las rutas de
+  administración de la API requieren `Authorization: Bearer <token>`; las rutas
+  públicas del formulario del alumno y los webhooks quedan abiertas.
+
+## Autenticación del dashboard
+
+Las rutas del panel están protegidas. Antes de ingresar hay que crear el
+usuario de administración:
+
+```bash
+# Definí las credenciales y ejecutá el seed (usa DATABASE_URL del .env)
+ADMIN_EMAIL=admin@escuelastop.com.ar ADMIN_PASSWORD=una-clave-segura \
+  npm run seed:admin --workspace @escuelastop/backend
+```
+
+Luego ingresá en `http://localhost:3000/login`. En producción, definí un
+`JWT_SECRET` largo y aleatorio (ver `.env.example`).
 
 ## Roadmap (próximos pasos)
 
-- [ ] **Autenticación** del dashboard (`admin_users`) — pendiente antes de producción.
+- [x] **Autenticación** del dashboard (`admin_users`).
 - [ ] **Extracción estructurada** de datos del chat (nombre, DNI, curso) con
       tool-use de Claude, para completar `contacts`/`enrollments` automáticamente.
 - [ ] **Ver los documentos en el dashboard** (ya existe `GET /enrollments/:id/documents`

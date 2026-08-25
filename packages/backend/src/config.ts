@@ -30,4 +30,10 @@ export const config = {
       accessToken: process.env.MP_ACCESS_TOKEN ?? '',
     },
   },
+  auth: {
+    // Secreto para firmar los tokens de sesión del dashboard (HS256).
+    // ⚠️ Definir JWT_SECRET en producción; el default solo sirve para desarrollo.
+    jwtSecret: process.env.JWT_SECRET ?? 'dev-secret-cambiar-en-produccion',
+    tokenTtlHours: Number(process.env.JWT_TTL_HOURS ?? 12),
+  },
 };

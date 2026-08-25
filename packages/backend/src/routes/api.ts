@@ -12,6 +12,8 @@ import {
 } from '../services/enrollments.js';
 import { evaluateLicense } from '../services/license.js';
 import { extractLicenseExpiry } from '../agent/vision.js';
+import { login } from '../services/auth.js';
+import { requireAuth } from '../middleware/auth.js';
 import type { MessagingChannel } from '../whatsapp/channel.js';
 import { COURSES, getCourse } from '../agent/catalog.js';
 import { paymentProvider } from '../payments/index.js';
@@ -36,6 +38,26 @@ const DOC_FIELDS: DocumentKind[] = ['foto_licencia', 'foto_dni', 'apto_medico'];
 export function makeApiRouter(channel: MessagingChannel): Router {
   const router = Router();
 
+  // --- Autenticación del dashboard (pública: es el punto de entrada) ---
+  router.post('/auth/login', async (req, res) => {
+    const { email, password } = req.body as { email?: string; password?: string };
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email y contraseña son requeridos' });
+      return;
+    }
+    const result = await login(email, password);
+    if (!result) {
+      res.status(401).json({ error: 'Credenciales inválidas' });
+      return;
+    }
+    res.json(result);
+  });
+
+  // Devuelve el admin autenticado (para validar el token desde el dashboard).
+  router.get('/auth/me', requireAuth, (req, res) => {
+    res.json({ id: req.admin!.sub, email: req.admin!.email, role: req.admin!.role });
+  });
+
   // --- Catálogo (fuente de verdad para el formulario dinámico) ---
   router.get('/catalog', (_req, res) => {
     res.json(COURSES);
@@ -50,22 +72,22 @@ export function makeApiRouter(channel: MessagingChannel): Router {
     res.json(course);
   });
 
-  // --- Contactos / Leads ---
-  router.get('/contacts', async (_req, res) => {
+  // --- Contactos / Leads --- (solo administración)
+  router.get('/contacts', requireAuth, async (_req, res) => {
     res.json(await listContacts());
   });
 
-  router.patch('/contacts/:id', async (req, res) => {
+  router.patch('/contacts/:id', requireAuth, async (req, res) => {
     res.json(await updateContact(req.params.id, req.body));
   });
 
   // --- Conversación ---
-  router.get('/contacts/:id/messages', async (req, res) => {
+  router.get('/contacts/:id/messages', requireAuth, async (req, res) => {
     res.json(await getConversation(req.params.id));
   });
 
   // Enviar mensaje directo desde el dashboard (contacto directo con el alumno).
-  router.post('/contacts/:id/messages', async (req, res) => {
+  router.post('/contacts/:id/messages', requireAuth, async (req, res) => {
     const { waId, body } = req.body as { waId: string; body: string };
     if (!waId || !body) {
       res.status(400).json({ error: 'waId y body son requeridos' });
@@ -76,20 +98,20 @@ export function makeApiRouter(channel: MessagingChannel): Router {
     res.json(saved);
   });
 
-  // --- Inscripciones ---
-  router.get('/enrollments', async (req, res) => {
+  // --- Inscripciones --- (solo administración)
+  router.get('/enrollments', requireAuth, async (req, res) => {
     const status = req.query.status as EnrollmentStatus | undefined;
     res.json(await listEnrollments(status));
   });
 
-  router.post('/enrollments', async (req, res) => {
+  router.post('/enrollments', requireAuth, async (req, res) => {
     const { contactId, course, sede } = req.body as {
       contactId: string; course?: string; sede?: string;
     };
     res.json(await createEnrollment(contactId, course, sede));
   });
 
-  router.patch('/enrollments/:id', async (req, res) => {
+  router.patch('/enrollments/:id', requireAuth, async (req, res) => {
     res.json(await updateEnrollment(req.params.id, req.body));
   });
 
@@ -173,13 +195,13 @@ export function makeApiRouter(channel: MessagingChannel): Router {
     },
   );
 
-  // Documentos de una inscripción (dashboard).
-  router.get('/enrollments/:id/documents', async (req, res) => {
+  // Documentos de una inscripción (dashboard, solo administración).
+  router.get('/enrollments/:id/documents', requireAuth, async (req, res) => {
     res.json(await listDocuments(req.params.id));
   });
 
-  // Servir un documento adjunto (dashboard). TODO: proteger con auth.
-  router.get('/documents/:id/file', async (req, res) => {
+  // Servir un documento adjunto (dashboard, solo administración).
+  router.get('/documents/:id/file', requireAuth, async (req, res) => {
     const doc = await getDocument(req.params.id);
     if (!doc) {
       res.status(404).send('No encontrado');

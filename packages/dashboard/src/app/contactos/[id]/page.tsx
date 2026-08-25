@@ -1,24 +1,34 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, type Message, type Contact } from '../../../lib/api';
+import { api, auth, UnauthorizedError, type Message, type Contact } from '../../../lib/api';
 
 // Vista de conversación + contacto directo con el alumno desde el panel.
 export default function ContactPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [contact, setContact] = useState<Contact | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
 
   async function load() {
-    const [msgs, contacts] = await Promise.all([api.messages(id), api.contacts()]);
-    setMessages(msgs);
-    setContact(contacts.find((c) => c.id === id) ?? null);
+    try {
+      const [msgs, contacts] = await Promise.all([api.messages(id), api.contacts()]);
+      setMessages(msgs);
+      setContact(contacts.find((c) => c.id === id) ?? null);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) router.replace('/login');
+    }
   }
 
   useEffect(() => {
+    if (!auth.isAuthenticated()) {
+      router.replace('/login');
+      return;
+    }
     load();
     const t = setInterval(load, 5000); // refresco simple; en producción usar websockets
     return () => clearInterval(t);

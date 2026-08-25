@@ -64,13 +64,92 @@ export interface Course {
   contactSucursal?: boolean;
 }
 
+// ------------------------------ Sesión -------------------------------------
+const TOKEN_KEY = 'stop_token';
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: 'admin' | 'operador';
+}
+
+export const auth = {
+  getToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      return window.localStorage.getItem(TOKEN_KEY);
+    } catch {
+      return null;
+    }
+  },
+  setToken(token: string): void {
+    try {
+      window.localStorage.setItem(TOKEN_KEY, token);
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  },
+  clearToken(): void {
+    try {
+      window.localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* noop */
+    }
+  },
+  isAuthenticated(): boolean {
+    return !!this.getToken();
+  },
+};
+
+/** Error lanzado cuando el token es inválido o expiró (HTTP 401). */
+export class UnauthorizedError extends Error {
+  constructor() {
+    super('No autorizado');
+    this.name = 'UnauthorizedError';
+  }
+}
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const token = auth.getToken();
+  return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extra };
+}
+
+function handle401(res: Response): void {
+  if (res.status === 401) {
+    auth.clearToken();
+    throw new UnauthorizedError();
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}/api${path}`, { cache: 'no-store' });
+  const res = await fetch(`${API_URL}/api${path}`, {
+    cache: 'no-store',
+    headers: authHeaders(),
+  });
+  handle401(res);
   if (!res.ok) throw new Error(`Error ${res.status} en ${path}`);
   return res.json();
 }
 
 export const api = {
+  // --- Autenticación ---
+  async login(email: string, password: string): Promise<{ token: string; user: AdminUser }> {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (res.status === 401) throw new Error('Email o contraseña incorrectos');
+    if (!res.ok) throw new Error('No se pudo iniciar sesión');
+    const data = (await res.json()) as { token: string; user: AdminUser };
+    auth.setToken(data.token);
+    return data;
+  },
+
+  logout(): void {
+    auth.clearToken();
+  },
+
   contacts: () => get<Contact[]>('/contacts'),
   enrollments: () => get<Enrollment[]>('/enrollments'),
   messages: (contactId: string) => get<Message[]>(`/contacts/${contactId}/messages`),
@@ -120,18 +199,20 @@ export const api = {
   },
 
   async sendMessage(contactId: string, waId: string, body: string): Promise<void> {
-    await fetch(`${API_URL}/api/contacts/${contactId}/messages`, {
+    const res = await fetch(`${API_URL}/api/contacts/${contactId}/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ waId, body }),
     });
+    handle401(res);
   },
 
   async updateEnrollment(id: string, status: string): Promise<void> {
-    await fetch(`${API_URL}/api/enrollments/${id}`, {
+    const res = await fetch(`${API_URL}/api/enrollments/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ status }),
     });
+    handle401(res);
   },
 };
