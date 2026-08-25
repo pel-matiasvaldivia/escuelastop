@@ -1,0 +1,29 @@
+# deps
+node_modules/
+packages/*/node_modules/
+
+# build
+dist/
+.next/
+build/
+
+# env
+.env
+.env.local
+packages/*/.env
+packages/*/.env.local
+
+# open-wa session (contiene credenciales de la sesión de WhatsApp)
+_IGNORE_*/
+.wwebjs_auth/
+session*.data.json
+tokens/
+whatsapp-session/
+
+# logs
+*.log
+npm-debug.log*
+
+# misc
+.DS_Store
+coverage/
