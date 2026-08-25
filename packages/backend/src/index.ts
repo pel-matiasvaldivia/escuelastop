@@ -4,9 +4,13 @@ import { config } from './config.js';
 import { OpenWaChannel } from './whatsapp/openwa.js';
 import { makeConversationHandler } from './whatsapp/conversation.js';
 import { makeApiRouter } from './routes/api.js';
+import { seedAdminFromEnv } from './services/auth.js';
 
 async function main() {
   const channel = new OpenWaChannel();
+
+  // Asegura el usuario admin (ADMIN_EMAIL/ADMIN_PASSWORD) si están definidos.
+  await seedAdminFromEnv();
 
   // --- API HTTP para el dashboard ---
   const app = express();

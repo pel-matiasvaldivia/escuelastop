@@ -112,6 +112,24 @@ export async function upsertAdmin(
   return res.rows[0];
 }
 
+/**
+ * Crea/actualiza el usuario admin a partir de ADMIN_EMAIL/ADMIN_PASSWORD si ambas
+ * están definidas. Se llama al arrancar el backend: idempotente y no fatal, deja
+ * la base con el usuario listo sin pasos manuales.
+ */
+export async function seedAdminFromEnv(): Promise<void> {
+  const email = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email || !password) return;
+  try {
+    const role = (process.env.ADMIN_ROLE as AdminRole) ?? 'admin';
+    const user = await upsertAdmin(email, password, role);
+    console.log(`✅ Usuario admin asegurado: ${user.email} (rol: ${user.role})`);
+  } catch (err) {
+    console.error('No se pudo asegurar el usuario admin desde el entorno:', err);
+  }
+}
+
 /** Verifica credenciales y devuelve un token de sesión, o null si son inválidas. */
 export async function login(
   email: string,
