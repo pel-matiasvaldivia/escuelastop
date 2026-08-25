@@ -59,7 +59,7 @@ services:
       WA_SESSION_ID: ${WA_SESSION_ID:-escuelastop}
       WA_HEADLESS: ${WA_HEADLESS:-true}
     ports:
-      - "3001:3001"
+      - "${PORT}:3001"
     volumes:
       - uploads:/app/packages/backend/uploads
       - wa_session:/app/packages/backend/whatsapp-session
