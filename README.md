@@ -64,19 +64,25 @@ WhatsApp del número dedicado para vincular la sesión.
 Implementado:
 - Estructura de monorepo, base de datos y configuración.
 - Canal de WhatsApp con open-wa detrás de una interfaz intercambiable.
-- Agente Claude con la base de conocimiento real de STOP (cursos, turnos,
-  precios y proceso de reserva).
+- **Catálogo estructurado** de cursos (`agent/catalog.ts`) como única fuente de
+  verdad: Particular B1, Profesional Renovación/Ampliación, Solo Prácticas,
+  Avanzado, Teoría sola y Alquiler del auto (con turnos, precios, cuotas, seña,
+  documentos y campos de formulario requeridos por curso).
+- Agente Claude cuya base de conocimiento se **genera a partir del catálogo**.
+- **Formulario de inscripción dinámico** (`/inscripcion/[token]`): los campos y
+  documentos que se piden cambian según el curso elegido. Modo híbrido: llega
+  prellenado con lo captado en el chat.
 - Persistencia de contactos, conversaciones e inscripciones.
-- API REST y dashboard con bandeja de leads/inscripciones y chat para contacto
-  directo.
+- API REST (incluye `/api/catalog`) y dashboard con bandeja de
+  leads/inscripciones y chat para contacto directo.
 
 ## Roadmap (próximos pasos)
 
 - [ ] **Autenticación** del dashboard (`admin_users`) — pendiente antes de producción.
 - [ ] **Extracción estructurada** de datos del chat (nombre, DNI, curso) con
       tool-use de Claude, para completar `contacts`/`enrollments` automáticamente.
-- [ ] **Formulario público** prellenado con `form_token` (adjuntar foto de
-      licencia, etc.).
+- [ ] **Guardado del formulario**: endpoint `POST /public/enrollment/:token` que
+      persista los valores y suba los adjuntos (foto de licencia/DNI).
 - [ ] **Handoff a humano**: pausar el bot cuando un operador toma la conversación.
 - [ ] **Plantillas de WhatsApp** aprobadas por Meta para mensajes proactivos.
 - [ ] **Métricas** (leads por curso/sede, conversión) y exportación a Excel.

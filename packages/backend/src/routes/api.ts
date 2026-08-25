@@ -6,6 +6,7 @@ import {
   type EnrollmentStatus,
 } from '../services/enrollments.js';
 import type { MessagingChannel } from '../whatsapp/channel.js';
+import { COURSES, getCourse } from '../agent/catalog.js';
 
 /**
  * Rutas REST que consume el dashboard de administración.
@@ -13,6 +14,20 @@ import type { MessagingChannel } from '../whatsapp/channel.js';
  */
 export function makeApiRouter(channel: MessagingChannel): Router {
   const router = Router();
+
+  // --- Catálogo (fuente de verdad para el formulario dinámico) ---
+  router.get('/catalog', (_req, res) => {
+    res.json(COURSES);
+  });
+
+  router.get('/catalog/:id', (req, res) => {
+    const course = getCourse(req.params.id);
+    if (!course) {
+      res.status(404).json({ error: 'Curso no encontrado' });
+      return;
+    }
+    res.json(course);
+  });
 
   // --- Contactos / Leads ---
   router.get('/contacts', async (_req, res) => {

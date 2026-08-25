@@ -31,6 +31,33 @@ export interface Message {
   created_at: string;
 }
 
+export type FormFieldKey =
+  | 'nombre' | 'dni' | 'edad' | 'email' | 'telefono'
+  | 'sucursal' | 'turno' | 'foto_licencia' | 'foto_dni' | 'apto_medico';
+
+export interface Schedule {
+  id: string;
+  sucursal: string;
+  turno: string;
+  dias: string;
+  horario: string;
+}
+
+export interface Course {
+  id: string;
+  name: string;
+  category: string;
+  price: number | null;
+  priceNote?: string;
+  description?: string;
+  includes?: string[];
+  schedules?: Schedule[];
+  requiredFields: FormFieldKey[];
+  requiredDocs?: string[];
+  notes?: string[];
+  contactSucursal?: boolean;
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}/api${path}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Error ${res.status} en ${path}`);
@@ -41,6 +68,8 @@ export const api = {
   contacts: () => get<Contact[]>('/contacts'),
   enrollments: () => get<Enrollment[]>('/enrollments'),
   messages: (contactId: string) => get<Message[]>(`/contacts/${contactId}/messages`),
+  catalog: () => get<Course[]>('/catalog'),
+  enrollmentByToken: (token: string) => get<Enrollment>(`/public/enrollment/${token}`),
 
   async sendMessage(contactId: string, waId: string, body: string): Promise<void> {
     await fetch(`${API_URL}/api/contacts/${contactId}/messages`, {
