@@ -30,12 +30,15 @@ export const config = {
     model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5',
   },
   whatsapp: {
+    // Apagado por defecto: el bot de WhatsApp se prende explícitamente
+    // (WA_ENABLED=true) para vincular el número. Así el backend arranca limpio.
+    enabled: (process.env.WA_ENABLED ?? 'false') === 'true',
     sessionId: process.env.WA_SESSION_ID ?? 'escuelastop',
     headless: (process.env.WA_HEADLESS ?? 'true') === 'true',
     // Ruta a Chromium (en Docker se instala por apt); si no se define, open-wa
     // usa el navegador que descarga puppeteer.
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    // true dentro de contenedores (sin sandbox de Chromium).
+    // true dentro de contenedores (agrega --no-sandbox a Chromium).
     docker: (process.env.WA_DOCKER ?? 'false') === 'true',
   },
   payments: {

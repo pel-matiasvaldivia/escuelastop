@@ -21,12 +21,14 @@ export class OpenWaChannel implements MessagingChannel {
       authTimeout: 0,
       // La sesión (credenciales) se persiste en disco; ver .gitignore.
       sessionDataPath: './whatsapp-session',
-      // En contenedores: usar el Chromium del sistema y desactivar el sandbox.
+      // En contenedores: usar el Chromium del sistema (executablePath) y
+      // desactivar el sandbox. NO usamos useChrome (buscaría Google Chrome, que
+      // no está instalado; la imagen trae chromium).
       ...(config.whatsapp.executablePath
-        ? { executablePath: config.whatsapp.executablePath }
+        ? { executablePath: config.whatsapp.executablePath, useChrome: false }
         : {}),
       ...(config.whatsapp.docker
-        ? { useChrome: true, chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox'] }
+        ? { chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox'] }
         : {}),
     });
 

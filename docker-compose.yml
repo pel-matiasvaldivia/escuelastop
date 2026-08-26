@@ -56,6 +56,7 @@ services:
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
       MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      WA_ENABLED: ${WA_ENABLED:-false}
       WA_SESSION_ID: ${WA_SESSION_ID:-escuelastop}
       WA_HEADLESS: ${WA_HEADLESS:-true}
     ports:
