@@ -8,10 +8,20 @@ function required(name: string, fallback?: string): string {
   return value;
 }
 
+// DASHBOARD_ORIGIN admite varios orígenes separados por coma (p.ej. localhost +
+// producción). CORS debe reflejar UN solo origen por request, así que se guarda
+// como lista y el middleware devuelve el que coincide.
+const corsOrigins = (process.env.DASHBOARD_ORIGIN ?? 'http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 export const config = {
   port: Number(process.env.PORT ?? 3001),
   databaseUrl: required('DATABASE_URL', 'postgresql://stop:stop@localhost:5432/escuelastop'),
-  dashboardOrigin: process.env.DASHBOARD_ORIGIN ?? 'http://localhost:3000',
+  // Primer origen (para usos que necesitan un único valor); lista completa en corsOrigins.
+  dashboardOrigin: corsOrigins[0],
+  corsOrigins,
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? 'http://localhost:3001',
   // Base pública del formulario de inscripción (el agente arma el link con esto).
   formBaseUrl: process.env.FORM_BASE_URL ?? process.env.DASHBOARD_ORIGIN ?? 'http://localhost:3000',
