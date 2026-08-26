@@ -22,10 +22,22 @@ export interface Enrollment {
   notes: string | null;
   license_expiry: string | null;
   license_status: 'vigente' | 'proxima' | 'vencida' | null;
+  license_verified: boolean;
+  form_token?: string;
   payment_status: 'pendiente' | 'aprobado' | 'rechazado';
   payment_amount: number | null;
   paid_at: string | null;
   updated_at: string;
+}
+
+export type DocumentKind = 'foto_licencia' | 'foto_dni' | 'apto_medico';
+
+export interface StudentDocument {
+  id: string;
+  enrollment_id: string;
+  kind: DocumentKind;
+  mime_type: string | null;
+  uploaded_at: string;
 }
 
 export type ChannelState = 'apagado' | 'iniciando' | 'qr' | 'conectado' | 'error';
@@ -205,6 +217,33 @@ export const api = {
     });
     if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo guardar el turno');
     return res.json();
+  },
+
+  // --- Ficha del alumno: inscripciones y documentos ---
+  contactEnrollments: (contactId: string) =>
+    get<Enrollment[]>(`/contacts/${contactId}/enrollments`),
+
+  enrollmentDocuments: (enrollmentId: string) =>
+    get<StudentDocument[]>(`/enrollments/${enrollmentId}/documents`),
+
+  /**
+   * URL para ver/descargar un documento. El token va en la query porque un
+   * <img> no puede enviar el header Authorization.
+   */
+  documentUrl(documentId: string): string {
+    return `${API_URL}/api/documents/${documentId}/file?token=${auth.getToken() ?? ''}`;
+  },
+
+  /** Aprueba o rechaza un caso de licencia pendiente de verificación. */
+  async reviewLicense(enrollmentId: string, approve: boolean, note?: string) {
+    const res = await fetch(`${API_URL}/api/enrollments/${enrollmentId}/license-review`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ approve, note }),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error('No se pudo registrar la revisión');
+    return res.json() as Promise<Enrollment>;
   },
 
   // --- WhatsApp: vinculación por QR ---

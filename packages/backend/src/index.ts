@@ -5,9 +5,16 @@ import { BaileysChannel } from './whatsapp/baileys.js';
 import { makeConversationHandler } from './whatsapp/conversation.js';
 import { makeApiRouter } from './routes/api.js';
 import { seedAdminFromEnv } from './services/auth.js';
+import { runMigrations } from './db/migrate.js';
 
 async function main() {
   const channel = new BaileysChannel();
+
+  // Aplica el esquema (DDL idempotente): crea tablas nuevas y agrega columnas
+  // faltantes en bases ya existentes. No es fatal si falla.
+  await runMigrations()
+    .then(() => console.log('✅ Esquema de base de datos al día'))
+    .catch((err) => console.error('No se pudo aplicar el esquema:', err));
 
   // Asegura el usuario admin (ADMIN_EMAIL/ADMIN_PASSWORD) si están definidos.
   await seedAdminFromEnv();

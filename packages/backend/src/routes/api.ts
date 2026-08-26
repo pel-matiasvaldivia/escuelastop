@@ -8,7 +8,8 @@ import { getConversation, saveMessage } from '../services/messages.js';
 import {
   listEnrollments, updateEnrollment, getEnrollmentByToken, createEnrollment,
   getEnrollmentById, setPaymentPending, applyPaymentStatus, saveScheduleAfterPayment,
-  setLicenseInfo, type EnrollmentStatus,
+  setLicenseInfo, listEnrollmentsByContact, resolveLicenseReview,
+  type EnrollmentStatus,
 } from '../services/enrollments.js';
 import { evaluateLicense } from '../services/license.js';
 import { extractLicenseExpiry } from '../agent/vision.js';
@@ -123,6 +124,11 @@ export function makeApiRouter(
     res.json(saved);
   });
 
+  // Inscripciones de un contacto (ficha del alumno en el panel).
+  router.get('/contacts/:id/enrollments', requireAuth, async (req, res) => {
+    res.json(await listEnrollmentsByContact(req.params.id));
+  });
+
   // --- Inscripciones --- (solo administración)
   router.get('/enrollments', requireAuth, async (req, res) => {
     const status = req.query.status as EnrollmentStatus | undefined;
@@ -138,6 +144,23 @@ export function makeApiRouter(
 
   router.patch('/enrollments/:id', requireAuth, async (req, res) => {
     res.json(await updateEnrollment(req.params.id, req.body));
+  });
+
+  // Resolución manual de un caso de licencia (aprobar o rechazar).
+  router.post('/enrollments/:id/license-review', requireAuth, async (req, res) => {
+    const { approve, note } = req.body as { approve?: boolean; note?: string };
+    if (typeof approve !== 'boolean') {
+      res.status(400).json({ error: 'Falta indicar approve (true/false)' });
+      return;
+    }
+    const updated = await resolveLicenseReview(
+      req.params.id, approve, req.admin!.email, note,
+    );
+    if (!updated) {
+      res.status(404).json({ error: 'Inscripción no encontrada' });
+      return;
+    }
+    res.json(updated);
   });
 
   // --- Formulario público prellenado (modo híbrido) ---
@@ -188,6 +211,12 @@ export function makeApiRouter(
           return;
         }
         const evalResult = evaluateLicense(expiry);
+
+        // Si administración ya revisó y habilitó el caso, no volvemos a frenarlo.
+        if (enrollment.license_verified && evalResult.needsHumanReview) {
+          res.json({ ok: true, licenseReview: false, licenseStatus: evalResult.status });
+          return;
+        }
 
         // Cotejo anti-fraude con Claude vision (best-effort, no bloquea el flujo).
         let note: string | undefined;

@@ -58,6 +58,7 @@ COPY --from=deps    /app/node_modules       /app/node_modules
 COPY --from=builder /app/packages/backend/dist ./dist
 COPY packages/backend/package.json ./package.json
 COPY packages/backend/src/db/schema.sql ./src/db/schema.sql
+COPY packages/backend/src/db/schema.sql ./dist/db/schema.sql
 
 # Directorios de datos (documentos subidos y sesión de WhatsApp).
 RUN mkdir -p uploads whatsapp-session
