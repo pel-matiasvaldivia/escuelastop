@@ -63,7 +63,13 @@ export class OpenWaChannel implements MessagingChannel {
       // ("Failed to launch the browser process! undefined"). Acá obtenemos el
       // motivo real y lo mostramos en el panel.
       if (config.whatsapp.executablePath) {
-        const check = await preflightChromium(config.whatsapp.executablePath, chromiumArgs);
+        // El preflight es una prueba de humo del binario: siempre con los flags
+        // de contenedor (sin --no-sandbox, Chromium se niega a correr como root).
+        // Los flags que recibe open-wa son otra cosa: los pone él.
+        const check = await preflightChromium(
+          config.whatsapp.executablePath,
+          chromiumArgs.length ? chromiumArgs : DOCKER_CHROMIUM_ARGS,
+        );
         if (!check.ok) {
           throw new Error(`Chromium no pudo iniciarse: ${check.detail}`);
         }
