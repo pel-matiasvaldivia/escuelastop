@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, use } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Course, type FormFieldKey , type SucursalInfo } from '../../../lib/api';
 
 const FIELD_LABELS: Record<FormFieldKey, string> = {
@@ -28,8 +28,10 @@ type Step = 'datos' | 'pago' | 'turno' | 'listo' | 'verificacion';
  * (3) recién ahí se habilita elegir sucursal y turno → (4) confirmación.
  * Esto evita las reservas de gente que después no se presenta.
  */
-export default function EnrollmentForm({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = use(params);
+// En Next 14 `params` es un objeto plano (recién en 15 pasa a ser una Promise).
+// Pasárselo a use() lanza el error de React #438 y rompe la página entera.
+export default function EnrollmentForm({ params }: { params: { token: string } }) {
+  const { token } = params;
   const [courses, setCourses] = useState<Course[]>([]);
   const [sucursales, setSucursales] = useState<SucursalInfo[]>([]);
   const [selectedId, setSelectedId] = useState('');
