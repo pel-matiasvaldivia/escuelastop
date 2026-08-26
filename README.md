@@ -92,6 +92,12 @@ Implementado:
 - Persistencia de contactos, conversaciones e inscripciones.
 - API REST (incluye `/api/catalog`) y dashboard con bandeja de
   leads/inscripciones y chat para contacto directo.
+- **Alta manual de inscripciones** desde el panel (`/inscripciones/nueva`): para
+  quien llamó por teléfono o vino a la sucursal. Crea o reutiliza el contacto
+  (el `wa_id` se arma con el teléfono normalizado, así que si esa persona
+  después escribe por WhatsApp cae sobre el mismo contacto), genera el link del
+  formulario para que suba la documentación y permite registrar la **seña
+  cobrada en efectivo/transferencia** para destrabar el gate de pago.
 - **Ficha del alumno** en el panel: dentro de cada contacto se ven sus
   inscripciones con estado, seña, vigencia de licencia y los **documentos
   subidos** (DNI, licencia, apto médico) como miniaturas. Desde ahí

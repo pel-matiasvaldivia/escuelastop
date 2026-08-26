@@ -124,6 +124,29 @@ export async function setLicenseInfo(
   return res.rows[0];
 }
 
+/**
+ * Registra una seña cobrada fuera del sistema (efectivo o transferencia en la
+ * sucursal). Deja el pago aprobado para que la inscripción pueda avanzar a
+ * sucursal/turno igual que si se hubiera pagado online.
+ */
+export async function registerManualPayment(
+  id: string, amount: number, reviewer: string,
+): Promise<Enrollment | null> {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const note = `💵 Seña de $${amount.toLocaleString('es-AR')} cobrada fuera del sistema, ` +
+    `registrada por ${reviewer} (${stamp})`;
+  const res = await query<Enrollment>(
+    `UPDATE enrollments
+     SET payment_status = 'aprobado', payment_amount = $2, paid_at = now(),
+         status = 'pagado',
+         notes = COALESCE(notes || E'\\n', '') || $3,
+         updated_at = now()
+     WHERE id = $1 RETURNING *`,
+    [id, amount, note],
+  );
+  return res.rows[0] ?? null;
+}
+
 /** Registra el intento de pago (id del proveedor + monto de la seña). */
 export async function setPaymentPending(
   id: string, paymentId: string, amount: number,
