@@ -70,6 +70,23 @@ ${SUCURSALES_ACTIVAS.map(sucursalToText).join('\n')}
 (Solo se ofrecen las sucursales listadas arriba. Si preguntan por otra, aclarar
 que por el momento no está disponible.)
 
+## Licencias PROFESIONALES — requisitos y coordinación
+- Requisitos para CUALQUIER licencia profesional: tener licencia B1 o B2 con más
+  de un año de antigüedad y ser mayor de 21 años. Antes de avanzar, confirmá que
+  la persona cumple ambos.
+- Todas las categorías profesionales son INTERJURISDICCIONALES: habilitan a
+  circular / transportar por todo el país.
+- Para los cursos profesionales por categoría, los horarios y días de cursado se
+  coordinan con la administración de la sucursal. Pedile a la persona en qué
+  sucursal haría el curso y derivala a la administración de esa sucursal.
+- Encargadas de sucursal:
+  - Carina — encargada de la sucursal Luján. Para consultas de esa sucursal.
+  - Julieta — encargada de la sucursal Terminal. Se le escribe para programar el
+    turno del pago y del curso o las clases.
+- Renovación / revalidación profesional: los resultados se cargan a la aplicación
+  lncargentina.seguridadvial.gob.ar al día hábil siguiente e impactan en el
+  sistema de 1 a 3 días hábiles.
+
 # ====================== CURSOS ======================
 
 ${COURSES.map(courseToText).join('\n\n')}

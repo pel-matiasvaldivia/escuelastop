@@ -14,7 +14,11 @@ export class MockPaymentProvider implements PaymentProvider {
 
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
     const paymentId = `mock_${randomUUID()}`;
-    this.statuses.set(paymentId, 'pendiente');
+    // MVP en modo test: el pago se aprueba automáticamente al iniciarse, para que
+    // el formulario avance solo a la selección de turno sin pasos manuales. La
+    // página de checkout simulada queda disponible por compatibilidad, pero el
+    // estado ya es 'aprobado' desde el arranque.
+    this.statuses.set(paymentId, 'aprobado');
     // Página de checkout simulada servida por el propio backend.
     const checkoutUrl =
       `${config.publicBaseUrl}/api/public/payments/mock/${paymentId}` +

@@ -75,6 +75,7 @@ export interface Course {
   name: string;
   category:
     | 'particular'
+    | 'profesional_categoria'
     | 'profesional_renovacion'
     | 'profesional_ampliacion'
     | 'practicas'
@@ -113,6 +114,18 @@ export interface Course {
   /** true = la reserva/contratación se hace comunicándose con la sucursal. */
   contactSucursal?: boolean;
 }
+
+/**
+ * Requisito general para CUALQUIER licencia profesional. Se repite como nota en
+ * cada curso profesional para que el agente lo tenga siempre a mano.
+ */
+const REQUISITO_PROFESIONAL =
+  'Requisitos para la licencia PROFESIONAL: tener licencia B1 o B2 con más de un ' +
+  'año de antigüedad y ser mayor de 21 años.';
+
+/** Material de estudio que incluyen todos los cursos profesionales. */
+const MATERIAL_PROFESIONAL =
+  'Material de estudio: leyes, señales viales a color, block para tomar notas y lapicera';
 
 const RESERVA_PROFESIONAL = {
   montoSenia: 50000,
@@ -159,25 +172,191 @@ export const COURSES: Course[] = [
     ],
   },
 
+  // ============================================================================
+  // Licencias PROFESIONALES por categoría (interjurisdiccionales: habilitan a
+  // circular/transportar por todo el país). Se coordinan con la sucursal: para
+  // horarios y días de cursado la persona elige sucursal y se la deriva a la
+  // administración de esa sucursal.
+  // ============================================================================
+
+  // ------------------------------------------- D1: Uber / Taxi / Remis
+  {
+    id: 'profesional-d1',
+    name: 'Profesional D1 — Uber, Taxi y Remis (hasta 8 pasajeros)',
+    category: 'profesional_categoria',
+    price: 220000,
+    priceNote: '¡En promoción! Precio interjurisdiccional (circulás por todo el país).',
+    description:
+      'Licencia profesional D1 para Uber, Taxi y Remis (hasta 8 pasajeros). ' +
+      'Interjurisdiccional. Curso en promoción.',
+    includes: [
+      'Teórico presencial (Curso Nacional)',
+      MATERIAL_PROFESIONAL,
+      'Práctica y evaluación en el coche escuela',
+      'Se rinde teoría y práctica en la escuela',
+      'Refrigerio cuando cursás la teoría',
+    ],
+    requiredFields: ['nombre', 'telefono', 'sucursal'],
+    contactSucursal: true,
+    notes: [
+      REQUISITO_PROFESIONAL,
+      'Para horarios y días de cursado, la persona elige sucursal y se la deriva a la administración de esa sucursal.',
+    ],
+  },
+
+  // ---------------------------- D3, D2 y D1: Micro, traffic y uber
+  {
+    id: 'profesional-d',
+    name: 'Profesional D3, D2 y D1 — Micro, traffic y Uber',
+    category: 'profesional_categoria',
+    price: 390000,
+    priceNote: '¡En promoción! Precio interjurisdiccional (circulás por todo el país).',
+    description:
+      'Licencia profesional D3, D2 y D1 para micro, traffic y Uber. ' +
+      'Interjurisdiccional. Curso en promoción.',
+    includes: [
+      'Teórico presencial (Curso Nacional)',
+      MATERIAL_PROFESIONAL,
+      'Práctica de 1 hora en el micro',
+      'Se rinde teoría y práctica en la escuela',
+      'Refrigerio cuando cursás la teoría',
+    ],
+    requiredFields: ['nombre', 'telefono', 'sucursal'],
+    contactSucursal: true,
+    notes: [
+      REQUISITO_PROFESIONAL,
+      'Opcional: una clase más de manejo de 1 hora cuesta $160.000 adicionales. El consejo es tomar la clase que ya viene con el curso (por lo general alcanza) y, si hace falta, comprar otra.',
+      'Para horarios y días de cursado, la persona elige sucursal y se la deriva a la administración de esa sucursal.',
+    ],
+  },
+
+  // ------------------------------- E1: C1, C2 y C3 Carga pesada
+  {
+    id: 'profesional-e1',
+    name: 'Profesional E1 — C1, C2 y C3 Carga pesada',
+    category: 'profesional_categoria',
+    price: 440000,
+    priceNote: 'Precio interjurisdiccional (transportás por todo el país).',
+    description:
+      'Licencia profesional E1 (C1, C2 y C3) para carga pesada. Interjurisdiccional.',
+    includes: [
+      'Teórico presencial (Curso Nacional)',
+      MATERIAL_PROFESIONAL,
+      '2 prácticas de 45 minutos en el camión',
+      'Evaluación en el camión para ver tu desempeño',
+      'Se rinde teoría y práctica en la escuela',
+      'Refrigerio cuando cursás la teoría',
+    ],
+    requiredFields: ['nombre', 'telefono', 'sucursal'],
+    contactSucursal: true,
+    notes: [
+      REQUISITO_PROFESIONAL,
+      'Para horarios y días de cursado, la persona elige sucursal y se la deriva a la administración de esa sucursal.',
+    ],
+  },
+
+  // ---------------------------------------- C1, C2 (camión)
+  {
+    id: 'profesional-c',
+    name: 'Profesional C1 y C2',
+    category: 'profesional_categoria',
+    price: 350000,
+    priceNote: 'Precio interjurisdiccional (transportás por todo el país).',
+    description: 'Licencia profesional C1 y C2. Interjurisdiccional.',
+    includes: [
+      'Teórico presencial (Curso Nacional)',
+      MATERIAL_PROFESIONAL,
+      '1 práctica de 45 minutos en el camión',
+      'Evaluación en el camión para ver tu desempeño',
+      'Se rinde teoría y práctica en la escuela',
+      'Refrigerio cuando cursás la teoría',
+    ],
+    requiredFields: ['nombre', 'telefono', 'sucursal'],
+    contactSucursal: true,
+    notes: [
+      REQUISITO_PROFESIONAL,
+      'Para horarios y días de cursado, la persona elige sucursal y se la deriva a la administración de esa sucursal.',
+    ],
+  },
+
+  // ----------------------------------- E2: Maquinaria especial
+  {
+    id: 'profesional-e2',
+    name: 'Profesional E2 — Maquinaria especial',
+    category: 'profesional_categoria',
+    price: 310000,
+    priceNote: 'Precio interjurisdiccional (manejás por todo el país).',
+    description: 'Licencia profesional E2 para maquinaria especial. Interjurisdiccional.',
+    includes: [
+      'Teórico presencial (Curso Nacional)',
+      MATERIAL_PROFESIONAL,
+      '1 práctica de 45 minutos en la maquinaria',
+      'Evaluación para ver tu desempeño',
+      'Se rinde teoría y práctica en la escuela',
+      'Refrigerio cuando cursás la teoría',
+    ],
+    requiredFields: ['nombre', 'telefono', 'sucursal'],
+    contactSucursal: true,
+    notes: [
+      REQUISITO_PROFESIONAL,
+      'Para horarios y días de cursado, la persona elige sucursal y se la deriva a la administración de esa sucursal.',
+    ],
+  },
+
+  // ------------------------- PROMO paquete de todas las categorías
+  {
+    id: 'profesional-paquete',
+    name: 'Profesional — Paquete todas las categorías (PROMO)',
+    category: 'profesional_categoria',
+    price: 590000,
+    priceNote: 'Promo: paquete con todas las categorías profesionales anteriores.',
+    description:
+      'Paquete promocional que incluye todas las categorías profesionales ' +
+      '(D1, D3/D2/D1, E1 y C1/C2). Interjurisdiccional.',
+    includes: [
+      'Todas las categorías profesionales anteriores (D1, D3/D2/D1, E1 y C1/C2)',
+      'Teórico presencial (Curso Nacional)',
+      MATERIAL_PROFESIONAL,
+      'Prácticas y evaluación en el vehículo según cada categoría',
+      'Refrigerio cuando cursás la teoría',
+    ],
+    requiredFields: ['nombre', 'telefono', 'sucursal'],
+    contactSucursal: true,
+    notes: [
+      REQUISITO_PROFESIONAL,
+      'Para horarios y días de cursado, la persona elige sucursal y se la deriva a la administración de esa sucursal.',
+    ],
+  },
+
   // ------------------------------------------------ Profesional — Renovación
   {
     id: 'profesional-renovacion',
-    name: 'Teoría Profesional — Renovación',
+    name: 'Teoría Profesional — Renovación / Revalidación',
     category: 'profesional_renovacion',
-    price: null,
-    priceNote: 'Consultar valor.',
-    description: 'Curso teórico profesional para renovación. Elegir un solo turno.',
+    price: 160000,
+    priceNote: 'Precio interjurisdiccional (transportás por todo el país).',
+    description:
+      'Renovación o revalidación de la licencia profesional. Se cursa, se rinde y ' +
+      'se aprueba en la escuela. Elegir un solo turno.',
     schedules: [
       { id: 'reno-1', sucursal: 'Guaymallén', turno: 'Mañana', dias: 'Lunes', horario: '09:00 a 14:00 hs' },
       { id: 'reno-2', sucursal: 'Guaymallén', turno: 'Tarde', dias: 'Lunes', horario: '15:00 a 20:00 hs' },
       { id: 'reno-3', sucursal: 'Guaymallén', turno: 'Mañana', dias: 'Miércoles', horario: '09:00 a 14:00 hs' },
       { id: 'reno-4', sucursal: 'Guaymallén', turno: 'Tarde', dias: 'Miércoles', horario: '15:00 a 20:00 hs' },
     ],
+    includes: [
+      'Teórico presencial (Curso Nacional) de 5 hs',
+      'Material de estudio: leyes, señales viales a color y block para tomar notas',
+      'Refrigerio cuando cursás la teoría',
+    ],
     reserva: RESERVA_PROFESIONAL,
     seniaReserva: 50000,
     requiredFields: ['nombre', 'email', 'telefono', 'sucursal', 'turno', 'foto_licencia'],
     requiredDocs: ['Foto de la licencia de conducir (solo de frente)'],
-    notes: ['Elegir un solo curso/turno del esquema.'],
+    notes: [
+      'Elegir un solo curso/turno del esquema.',
+      'Los resultados del curso se cargan a la aplicación lncargentina.seguridadvial.gob.ar al día hábil siguiente e impactan en el sistema de 1 a 3 días hábiles.',
+    ],
   },
 
   // ------------------------------------------------ Profesional — Ampliación
