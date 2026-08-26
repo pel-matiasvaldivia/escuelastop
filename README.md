@@ -92,6 +92,14 @@ Implementado:
 - Persistencia de contactos, conversaciones e inscripciones.
 - API REST (incluye `/api/catalog`) y dashboard con bandeja de
   leads/inscripciones y chat para contacto directo.
+- **Handoff a humano**: cuando un operador escribe desde el panel, el bot se
+  pausa automáticamente para ese contacto y deja de responder; los mensajes que
+  llegan siguen registrándose. Se puede tomar/devolver la conversación a mano
+  desde la ficha ("Tomar conversación" / "Devolver al bot").
+- **Sucursales** en `agent/catalog.ts` (`SUCURSALES`): única fuente de verdad del
+  formulario, el alta manual y la base de conocimiento. Hoy solo está activa
+  **Guaymallén**; Las Heras y San Martín quedan definidas pero inactivas — para
+  habilitarlas alcanza con poner `activa: true` y cargarles la dirección.
 - **Alta manual de inscripciones** desde el panel (`/inscripciones/nueva`): para
   quien llamó por teléfono o vino a la sucursal. Crea o reutiliza el contacto
   (el `wa_id` se arma con el teléfono normalizado, así que si esa persona
@@ -207,7 +215,6 @@ Luego ingresá en `http://localhost:3000/login`. En producción, definí un
       producción usar S3/almacenamiento gestionado con URLs firmadas.
 - [ ] Configurar **Mercado Pago real** (`PAYMENT_PROVIDER=mercadopago` + `MP_ACCESS_TOKEN`)
       y confirmar el **monto de seña** de cada curso (hoy $50.000, a validar en Particular).
-- [ ] **Handoff a humano**: pausar el bot cuando un operador toma la conversación.
 - [ ] **Plantillas de WhatsApp** aprobadas por Meta para mensajes proactivos.
 - [ ] **Métricas** (leads por curso/sede, conversión) y exportación a Excel.
 - [ ] **Cumplimiento Ley 25.326**: consentimiento, política de privacidad, opt-out.

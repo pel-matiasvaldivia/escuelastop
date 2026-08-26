@@ -10,7 +10,39 @@
  * Fuente: información oficial provista por la escuela.
  */
 
-export type Sucursal = 'Guaymallén' | 'Las Heras';
+export type Sucursal = 'Guaymallén' | 'Las Heras' | 'San Martín';
+
+export interface SucursalInfo {
+  id: string;
+  nombre: Sucursal;
+  /** Dirección para mostrar al alumno; si falta, no se publica. */
+  direccion?: string;
+  /**
+   * Solo las activas se ofrecen en el formulario, en el alta manual y en las
+   * respuestas del agente. Para habilitar una sucursal alcanza con poner
+   * `activa: true` (y cargarle la dirección).
+   */
+  activa: boolean;
+}
+
+/**
+ * Sucursales de la escuela. ÚNICA fuente de verdad: el formulario, el panel y
+ * la base de conocimiento del agente se arman a partir de esta lista.
+ */
+export const SUCURSALES: SucursalInfo[] = [
+  { id: 'guaymallen', nombre: 'Guaymallén', activa: true },
+  // Desactivadas por ahora; se habilitan poniendo activa: true.
+  { id: 'las-heras', nombre: 'Las Heras', activa: false },
+  { id: 'san-martin', nombre: 'San Martín', activa: false },
+];
+
+/** Sucursales que hoy se ofrecen al alumno. */
+export const SUCURSALES_ACTIVAS = SUCURSALES.filter((s) => s.activa);
+
+/** ¿Está operativa esta sucursal? (valida lo que llega del formulario). */
+export function isSucursalActiva(nombre: string): boolean {
+  return SUCURSALES_ACTIVAS.some((s) => s.nombre === nombre);
+}
 
 /** Campos que el formulario puede pedir. El curso declara cuáles necesita. */
 export type FormFieldKey =

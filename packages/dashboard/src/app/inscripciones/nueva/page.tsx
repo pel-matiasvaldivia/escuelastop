@@ -3,7 +3,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, auth, UnauthorizedError, type Course } from '../../../lib/api';
+import {
+  api, auth, UnauthorizedError, type Course, type SucursalInfo,
+} from '../../../lib/api';
 
 /**
  * Alta manual de una inscripción: para quien llamó por teléfono o vino a la
@@ -13,6 +15,7 @@ import { api, auth, UnauthorizedError, type Course } from '../../../lib/api';
 export default function NuevaInscripcionPage() {
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [sucursales, setSucursales] = useState<SucursalInfo[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ formUrl: string; contactId: string } | null>(null);
@@ -29,6 +32,7 @@ export default function NuevaInscripcionPage() {
       return;
     }
     api.catalog().then(setCourses).catch(() => setCourses([]));
+    api.sucursales().then(setSucursales).catch(() => setSucursales([]));
   }, [router]);
 
   const selected = courses.find((c) => c.id === form.courseId);
@@ -160,8 +164,11 @@ export default function NuevaInscripcionPage() {
         <Field label="Sucursal">
           <select value={form.sede} onChange={(e) => set('sede', e.target.value)} style={input}>
             <option value="">— A definir —</option>
-            <option value="Guaymallén">Guaymallén</option>
-            <option value="Las Heras">Las Heras</option>
+            {sucursales.map((suc) => (
+              <option key={suc.id} value={suc.nombre}>
+                {suc.nombre}{suc.direccion ? ` — ${suc.direccion}` : ''}
+              </option>
+            ))}
           </select>
         </Field>
 

@@ -11,6 +11,9 @@ export interface Contact {
   preferred_sede: string | null;
   interest: string | null;
   consent_given: boolean;
+  /** true = un operador tomó la conversación y el bot no responde. */
+  bot_paused: boolean;
+  bot_paused_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -88,6 +91,22 @@ export async function upsertManualContact(data: {
 export async function listContacts(): Promise<Contact[]> {
   const res = await query<Contact>('SELECT * FROM contacts ORDER BY updated_at DESC LIMIT 200');
   return res.rows;
+}
+
+/**
+ * Handoff a humano: pausa o reanuda las respuestas automáticas para un contacto.
+ * Se llama explícitamente desde el panel y también al enviar un mensaje manual.
+ */
+export async function setBotPaused(id: string, paused: boolean): Promise<Contact> {
+  const res = await query<Contact>(
+    `UPDATE contacts
+     SET bot_paused = $2,
+         bot_paused_at = CASE WHEN $2 THEN now() ELSE NULL END,
+         updated_at = now()
+     WHERE id = $1 RETURNING *`,
+    [id, paused],
+  );
+  return res.rows[0];
 }
 
 export async function updateContact(id: string, fields: Partial<Contact>): Promise<Contact> {

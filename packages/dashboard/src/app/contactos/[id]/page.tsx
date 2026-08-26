@@ -36,6 +36,17 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Handoff a humano: al enviar un mensaje el backend pausa el bot solo, pero
+  // también se puede alternar a mano.
+  async function toggleBot() {
+    if (!contact) return;
+    try {
+      setContact(await api.setBotPaused(id, !contact.bot_paused));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo cambiar el bot');
+    }
+  }
+
   async function send() {
     if (!draft.trim() || !contact) return;
     setSending(true);
@@ -65,7 +76,35 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
         <FichaAlumno contactId={id} />
       </section>
 
-      <h3 style={{ fontSize: 16, marginBottom: 10 }}>Conversación</h3>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        flexWrap: 'wrap', gap: 10, marginBottom: 10,
+      }}>
+        <h3 style={{ fontSize: 16, margin: 0 }}>Conversación</h3>
+        {contact && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{
+              background: contact.bot_paused ? '#ea580c' : '#16a34a', color: '#fff',
+              padding: '3px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+            }}>
+              {contact.bot_paused ? '⏸️ Atiende un operador' : '🤖 Responde el bot'}
+            </span>
+            <button onClick={toggleBot} style={{
+              padding: '6px 14px', background: '#fff', color: '#334155',
+              border: '1px solid #cbd5e1', borderRadius: 8,
+              fontSize: 13, cursor: 'pointer',
+            }}>
+              {contact.bot_paused ? 'Devolver al bot' : 'Tomar conversación'}
+            </button>
+          </div>
+        )}
+      </div>
+      {contact?.bot_paused && (
+        <p style={{ fontSize: 13, color: '#9a3412', marginTop: 0 }}>
+          El bot no está respondiendo a este contacto. Los mensajes que llegan
+          quedan registrados acá para que los conteste una persona.
+        </p>
+      )}
 
       <div style={{
         background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,

@@ -10,7 +10,17 @@ export interface Contact {
   preferred_sede: string | null;
   interest: string | null;
   consent_given: boolean;
+  /** true = un operador tomó la conversación y el bot no responde. */
+  bot_paused: boolean;
+  bot_paused_at: string | null;
   updated_at: string;
+}
+
+export interface SucursalInfo {
+  id: string;
+  nombre: string;
+  direccion?: string;
+  activa: boolean;
 }
 
 export interface Enrollment {
@@ -175,6 +185,8 @@ export const api = {
   enrollments: () => get<Enrollment[]>('/enrollments'),
   messages: (contactId: string) => get<Message[]>(`/contacts/${contactId}/messages`),
   catalog: () => get<Course[]>('/catalog'),
+  /** Sucursales operativas (las inactivas no se ofrecen). */
+  sucursales: () => get<SucursalInfo[]>('/catalog/sucursales'),
   enrollmentByToken: (token: string) => get<Enrollment>(`/public/enrollment/${token}`),
 
   // --- Paso 1: datos personales + fotos (multipart) ---
@@ -216,6 +228,18 @@ export const api = {
       body: JSON.stringify({ sede, notes }),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo guardar el turno');
+    return res.json();
+  },
+
+  /** Handoff a humano: pausa o reanuda el bot para un contacto. */
+  async setBotPaused(contactId: string, paused: boolean): Promise<Contact> {
+    const res = await fetch(`${API_URL}/api/contacts/${contactId}/bot`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ paused }),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error('No se pudo cambiar el estado del bot');
     return res.json();
   },
 
