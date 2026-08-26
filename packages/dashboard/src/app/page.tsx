@@ -42,7 +42,18 @@ export default function HomePage() {
   return (
     <div style={{ display: 'grid', gap: 32 }}>
       <section>
-        <h2>Inscripciones</h2>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', flexWrap: 'wrap', gap: 10,
+        }}>
+          <h2 style={{ margin: 0 }}>Inscripciones</h2>
+          <Link href="/inscripciones/nueva" style={{
+            padding: '9px 18px', background: '#0f172a', color: '#fff',
+            borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none',
+          }}>
+            + Nueva inscripción
+          </Link>
+        </div>
         <table style={tableStyle}>
           <thead>
             <tr>

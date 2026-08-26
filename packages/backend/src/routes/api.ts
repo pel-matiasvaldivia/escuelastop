@@ -2,14 +2,14 @@ import { Router } from 'express';
 import multer from 'multer';
 import { existsSync, mkdirSync } from 'node:fs';
 import { extname } from 'node:path';
-import { listContacts, updateContact } from '../services/contacts.js';
+import { listContacts, updateContact, upsertManualContact } from '../services/contacts.js';
 import { saveDocument, listDocuments, getDocument, type DocumentKind } from '../services/documents.js';
 import { getConversation, saveMessage } from '../services/messages.js';
 import {
   listEnrollments, updateEnrollment, getEnrollmentByToken, createEnrollment,
   getEnrollmentById, setPaymentPending, applyPaymentStatus, saveScheduleAfterPayment,
   setLicenseInfo, listEnrollmentsByContact, resolveLicenseReview,
-  type EnrollmentStatus,
+  registerManualPayment, type EnrollmentStatus,
 } from '../services/enrollments.js';
 import { evaluateLicense } from '../services/license.js';
 import { extractLicenseExpiry } from '../agent/vision.js';
@@ -144,6 +144,65 @@ export function makeApiRouter(
 
   router.patch('/enrollments/:id', requireAuth, async (req, res) => {
     res.json(await updateEnrollment(req.params.id, req.body));
+  });
+
+  /**
+   * Inscripción cargada a mano desde el panel (alguien que llamó por teléfono o
+   * vino a la sucursal). Crea/reutiliza el contacto y genera la inscripción.
+   *
+   * Devuelve además el link del formulario para que el alumno complete sus datos
+   * y suba la documentación, sin tener que pasar por WhatsApp.
+   */
+  router.post('/enrollments/manual', requireAuth, async (req, res) => {
+    const {
+      fullName, phone, email, dni, age, courseId, sede, notes, senaCobrada,
+    } = req.body as {
+      fullName?: string; phone?: string; email?: string; dni?: string;
+      age?: number; courseId?: string; sede?: string; notes?: string;
+      senaCobrada?: boolean;
+    };
+
+    if (!fullName?.trim() || !phone?.trim()) {
+      res.status(400).json({ error: 'Nombre y teléfono son requeridos' });
+      return;
+    }
+    const course = courseId ? getCourse(courseId) : undefined;
+    if (courseId && !course) {
+      res.status(400).json({ error: 'Curso inválido' });
+      return;
+    }
+
+    const contact = await upsertManualContact({
+      fullName: fullName.trim(),
+      phone: phone.trim(),
+      email: email?.trim() || undefined,
+      dni: dni?.trim() || undefined,
+      age: age ?? undefined,
+      interest: course?.name,
+    });
+
+    let enrollment = await createEnrollment(contact.id, course?.name, sede?.trim() || undefined);
+
+    const baseNote = `📋 Inscripción cargada manualmente por ${req.admin!.email}`;
+    enrollment = await updateEnrollment(enrollment.id, {
+      status: 'contactado',
+      notes: notes?.trim() ? `${baseNote}\n${notes.trim()}` : baseNote,
+    });
+
+    // Seña cobrada en la sucursal: se registra para que la inscripción pueda
+    // avanzar a sucursal/turno sin pasar por el checkout online.
+    if (senaCobrada && course?.seniaReserva) {
+      const paid = await registerManualPayment(
+        enrollment.id, course.seniaReserva, req.admin!.email,
+      );
+      if (paid) enrollment = paid;
+    }
+
+    res.json({
+      contact,
+      enrollment,
+      formUrl: `${config.formBaseUrl}/inscripcion/${enrollment.form_token}`,
+    });
   });
 
   // Resolución manual de un caso de licencia (aprobar o rechazar).

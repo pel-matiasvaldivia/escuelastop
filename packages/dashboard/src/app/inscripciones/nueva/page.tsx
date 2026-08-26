@@ -1,0 +1,228 @@
+'use client';
+
+import { useEffect, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { api, auth, UnauthorizedError, type Course } from '../../../lib/api';
+
+/**
+ * Alta manual de una inscripción: para quien llamó por teléfono o vino a la
+ * sucursal y no pasó por WhatsApp. Al guardar se genera el link del formulario
+ * para que el alumno complete sus datos y suba la documentación.
+ */
+export default function NuevaInscripcionPage() {
+  const router = useRouter();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ formUrl: string; contactId: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const [form, setForm] = useState({
+    fullName: '', phone: '', email: '', dni: '', age: '',
+    courseId: '', sede: '', notes: '', senaCobrada: false,
+  });
+
+  useEffect(() => {
+    if (!auth.isAuthenticated()) {
+      router.replace('/login');
+      return;
+    }
+    api.catalog().then(setCourses).catch(() => setCourses([]));
+  }, [router]);
+
+  const selected = courses.find((c) => c.id === form.courseId);
+
+  function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await api.createManualEnrollment({
+        fullName: form.fullName,
+        phone: form.phone,
+        email: form.email || undefined,
+        dni: form.dni || undefined,
+        age: form.age ? Number(form.age) : undefined,
+        courseId: form.courseId || undefined,
+        sede: form.sede || undefined,
+        notes: form.notes || undefined,
+        senaCobrada: form.senaCobrada,
+      });
+      setResult({ formUrl: res.formUrl, contactId: res.contact.id });
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        router.replace('/login');
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Error al crear la inscripción');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // --- Confirmación con el link del formulario ---
+  if (result) {
+    return (
+      <div style={{ maxWidth: 620 }}>
+        <h2>✅ Inscripción creada</h2>
+        <p style={{ color: '#475569' }}>
+          Pasale este link al alumno para que complete sus datos y suba la
+          documentación (DNI, licencia):
+        </p>
+        <div style={{
+          display: 'flex', gap: 8, alignItems: 'center', background: '#f8fafc',
+          border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, marginBottom: 16,
+        }}>
+          <code style={{ flex: 1, fontSize: 13, wordBreak: 'break-all' }}>
+            {result.formUrl}
+          </code>
+          <button
+            onClick={() => {
+              navigator.clipboard?.writeText(result.formUrl);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+            style={{ ...primaryBtn, padding: '8px 14px', fontSize: 13 }}
+          >
+            {copied ? '¡Copiado!' : 'Copiar'}
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Link href={`/contactos/${result.contactId}`} style={{ ...primaryBtn, textDecoration: 'none' }}>
+            Ver ficha del alumno
+          </Link>
+          <button
+            onClick={() => {
+              setResult(null);
+              setForm({
+                fullName: '', phone: '', email: '', dni: '', age: '',
+                courseId: '', sede: '', notes: '', senaCobrada: false,
+              });
+            }}
+            style={secondaryBtn}
+          >
+            Cargar otra
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 620 }}>
+      <Link href="/" style={{ color: '#2563eb', fontSize: 14 }}>← Volver</Link>
+      <h2 style={{ marginBottom: 4 }}>Nueva inscripción</h2>
+      <p style={{ color: '#64748b', fontSize: 14, marginTop: 0 }}>
+        Para alumnos que se contactaron por teléfono o vinieron a la sucursal.
+      </p>
+
+      <form onSubmit={onSubmit} style={{
+        background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
+        padding: 24, display: 'grid', gap: 14,
+      }}>
+        <Field label="Nombre y apellido *">
+          <input required value={form.fullName}
+            onChange={(e) => set('fullName', e.target.value)} style={input} />
+        </Field>
+
+        <Field label="Teléfono *" hint="Con característica, ej: 261 123-4567">
+          <input required value={form.phone}
+            onChange={(e) => set('phone', e.target.value)} style={input} />
+        </Field>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <Field label="DNI">
+            <input value={form.dni} onChange={(e) => set('dni', e.target.value)} style={input} />
+          </Field>
+          <Field label="Edad">
+            <input type="number" min={16} max={99} value={form.age}
+              onChange={(e) => set('age', e.target.value)} style={input} />
+          </Field>
+        </div>
+
+        <Field label="Email">
+          <input type="email" value={form.email}
+            onChange={(e) => set('email', e.target.value)} style={input} />
+        </Field>
+
+        <Field label="Curso">
+          <select value={form.courseId} onChange={(e) => set('courseId', e.target.value)} style={input}>
+            <option value="">— Seleccionar —</option>
+            {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Field>
+
+        <Field label="Sucursal">
+          <select value={form.sede} onChange={(e) => set('sede', e.target.value)} style={input}>
+            <option value="">— A definir —</option>
+            <option value="Guaymallén">Guaymallén</option>
+            <option value="Las Heras">Las Heras</option>
+          </select>
+        </Field>
+
+        <Field label="Notas internas">
+          <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)}
+            rows={2} style={{ ...input, resize: 'vertical' }} />
+        </Field>
+
+        {selected?.seniaReserva ? (
+          <label style={{
+            display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 14,
+            background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 12,
+          }}>
+            <input type="checkbox" checked={form.senaCobrada}
+              onChange={(e) => set('senaCobrada', e.target.checked)} style={{ marginTop: 3 }} />
+            <span>
+              <strong>Ya cobré la seña</strong> de ${selected.seniaReserva.toLocaleString('es-AR')}{' '}
+              (efectivo o transferencia).
+              <br />
+              <span style={{ color: '#475569', fontSize: 13 }}>
+                Si la tildás, el alumno podrá elegir sucursal y turno sin pagar online.
+              </span>
+            </span>
+          </label>
+        ) : null}
+
+        {error && <p style={{ color: '#b91c1c', margin: 0, fontSize: 14 }}>{error}</p>}
+
+        <button type="submit" disabled={busy} style={primaryBtn}>
+          {busy ? 'Creando…' : 'Crear inscripción'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function Field({ label, hint, children }: {
+  label: string; hint?: string; children: React.ReactNode;
+}) {
+  return (
+    <label style={{ display: 'grid', gap: 5, fontSize: 14, color: '#334155' }}>
+      <span>
+        {label}
+        {hint && <span style={{ color: '#94a3b8', fontWeight: 400 }}> · {hint}</span>}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+const input = {
+  padding: 10, borderRadius: 8, border: '1px solid #cbd5e1',
+  fontSize: 15, width: '100%', boxSizing: 'border-box' as const,
+  fontFamily: 'inherit',
+};
+const primaryBtn = {
+  padding: '11px 20px', background: '#0f172a', color: '#fff', border: 'none',
+  borderRadius: 8, cursor: 'pointer', fontSize: 15, fontWeight: 600,
+  display: 'inline-block', textAlign: 'center' as const,
+} as const;
+const secondaryBtn = {
+  padding: '11px 20px', background: '#fff', color: '#334155',
+  border: '1px solid #cbd5e1', borderRadius: 8, cursor: 'pointer', fontSize: 15,
+} as const;

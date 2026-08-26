@@ -219,6 +219,26 @@ export const api = {
     return res.json();
   },
 
+  /** Carga manual de una inscripción (teléfono / mostrador). */
+  async createManualEnrollment(data: {
+    fullName: string; phone: string; email?: string; dni?: string;
+    age?: number; courseId?: string; sede?: string; notes?: string;
+    senaCobrada?: boolean;
+  }) {
+    const res = await fetch(`${API_URL}/api/enrollments/manual`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data),
+    });
+    handle401(res);
+    if (!res.ok) {
+      throw new Error((await res.json()).error ?? 'No se pudo crear la inscripción');
+    }
+    return res.json() as Promise<{
+      contact: Contact; enrollment: Enrollment; formUrl: string;
+    }>;
+  },
+
   // --- Ficha del alumno: inscripciones y documentos ---
   contactEnrollments: (contactId: string) =>
     get<Enrollment[]>(`/contacts/${contactId}/enrollments`),
