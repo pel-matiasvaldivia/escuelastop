@@ -212,7 +212,7 @@ export const api = {
       body: JSON.stringify({ courseId, contactId, payerEmail }),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? 'Error iniciando el pago');
-    return res.json() as Promise<{ checkoutUrl: string; formToken: string }>;
+    return res.json() as Promise<{ checkoutUrl: string; formToken: string; simulated?: boolean }>;
   },
 
   async paymentStatus(token: string) {

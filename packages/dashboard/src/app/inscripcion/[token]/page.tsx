@@ -41,6 +41,7 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
   const [licenseInfo, setLicenseInfo] = useState<{ status: string; days: number } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [simulatedPay, setSimulatedPay] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -108,10 +109,12 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
       }
 
       if (!requiresPayment) { setStep('turno'); return; }
-      const { checkoutUrl } = await api.startPayment(token, course.id, undefined, values.email);
+      const { checkoutUrl, simulated } = await api.startPayment(token, course.id, undefined, values.email);
+      setSimulatedPay(!!simulated);
       setStep('pago');
-      // Abrimos el checkout en otra pestaña y empezamos a chequear el estado.
-      window.open(checkoutUrl, '_blank');
+      // En modo test (mock) el pago se aprueba solo: no abrimos checkout, solo
+      // hacemos polling hasta que el backend confirme y avanzamos al turno.
+      if (!simulated) window.open(checkoutUrl, '_blank');
       startPolling();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error iniciando el pago');
@@ -207,10 +210,13 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
       {/* Paso 2: esperando confirmación del pago */}
       {step === 'pago' && (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <p style={{ fontSize: 15 }}>Esperando la confirmación del pago…</p>
+          <p style={{ fontSize: 15 }}>
+            {simulatedPay ? 'Procesando el pago de prueba…' : 'Esperando la confirmación del pago…'}
+          </p>
           <p style={{ color: '#64748b', fontSize: 14 }}>
-            Completá el pago en la pestaña que se abrió. Esta página se actualiza sola
-            cuando se acredite.
+            {simulatedPay
+              ? 'Estás en modo de prueba: la seña se acredita automáticamente. En unos segundos vas a poder elegir tu turno.'
+              : 'Completá el pago en la pestaña que se abrió. Esta página se actualiza sola cuando se acredite.'}
           </p>
           <div style={{ fontSize: 32 }}>⏳</div>
         </div>

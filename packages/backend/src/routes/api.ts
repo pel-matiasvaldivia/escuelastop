@@ -379,7 +379,13 @@ export function makeApiRouter(
       payerEmail,
     });
     await setPaymentPending(enrollment.id, payment.paymentId, course.seniaReserva);
-    res.json({ checkoutUrl: payment.checkoutUrl, formToken: enrollment.form_token });
+    // En modo mock (MVP de prueba) el pago se aprueba solo; el frontend usa este
+    // flag para no abrir el checkout y avanzar directo al turno.
+    res.json({
+      checkoutUrl: payment.checkoutUrl,
+      formToken: enrollment.form_token,
+      simulated: paymentProvider instanceof MockPaymentProvider,
+    });
   });
 
   // 2) Consultar estado del pago (el formulario hace polling hasta 'aprobado').
