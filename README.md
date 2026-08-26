@@ -92,6 +92,12 @@ Implementado:
 - Persistencia de contactos, conversaciones e inscripciones.
 - API REST (incluye `/api/catalog`) y dashboard con bandeja de
   leads/inscripciones y chat para contacto directo.
+- **Ficha del alumno** en el panel: dentro de cada contacto se ven sus
+  inscripciones con estado, seña, vigencia de licencia y los **documentos
+  subidos** (DNI, licencia, apto médico) como miniaturas. Desde ahí
+  administración **habilita o rechaza** los trámites que quedaron en
+  `pendiente_verificacion`; al habilitar, el alumno puede seguir al pago aunque
+  la licencia esté vencida (queda registrado quién lo autorizó).
 - **Autenticación del dashboard** (`admin_users`): login con email/contraseña,
   contraseñas con scrypt y sesión por token JWT (HS256). Las rutas de
   administración de la API requieren `Authorization: Bearer <token>`; las rutas
@@ -188,8 +194,8 @@ Luego ingresá en `http://localhost:3000/login`. En producción, definí un
       publica imágenes en GHCR.
 - [ ] **Extracción estructurada** de datos del chat (nombre, DNI, curso) con
       tool-use de Claude, para completar `contacts`/`enrollments` automáticamente.
-- [ ] **Ver los documentos en el dashboard** (ya existe `GET /enrollments/:id/documents`
-      y `GET /documents/:id/file`; falta la UI en la ficha del alumno).
+- [x] **Ver los documentos en el dashboard** y resolver los casos pendientes de
+      verificación de licencia desde la ficha del alumno.
 - [ ] **Firmar/validar el webhook de Mercado Pago** (x-signature) antes de producción.
 - [ ] **Almacenamiento de archivos**: hoy en disco local (`uploads/`); para
       producción usar S3/almacenamiento gestionado con URLs firmadas.

@@ -4,6 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, auth, UnauthorizedError, type Message, type Contact } from '../../../lib/api';
+import FichaAlumno from '../../../components/FichaAlumno';
 
 // Vista de conversación + contacto directo con el alumno desde el panel.
 export default function ContactPage({ params }: { params: Promise<{ id: string }> }) {
@@ -50,7 +51,21 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
   return (
     <div>
       <Link href="/" style={{ color: '#2563eb' }}>← Volver</Link>
-      <h2>{contact?.full_name ?? contact?.phone ?? 'Conversación'}</h2>
+      <h2 style={{ marginBottom: 4 }}>{contact?.full_name ?? contact?.phone ?? 'Conversación'}</h2>
+      {contact && (
+        <p style={{ color: '#64748b', fontSize: 14, marginTop: 0 }}>
+          {contact.phone ?? '—'}
+          {contact.dni && ` · DNI ${contact.dni}`}
+          {contact.interest && ` · ${contact.interest}`}
+        </p>
+      )}
+
+      <section style={{ margin: '20px 0 28px' }}>
+        <h3 style={{ fontSize: 16, marginBottom: 10 }}>Inscripciones y documentos</h3>
+        <FichaAlumno contactId={id} />
+      </section>
+
+      <h3 style={{ fontSize: 16, marginBottom: 10 }}>Conversación</h3>
 
       <div style={{
         background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,

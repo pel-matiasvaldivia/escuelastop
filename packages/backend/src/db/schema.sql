@@ -87,3 +87,13 @@ CREATE TABLE IF NOT EXISTS admin_users (
   role          TEXT NOT NULL DEFAULT 'operador' CHECK (role IN ('admin','operador')),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ---------------------------------------------------------------------------
+-- Migraciones idempotentes (se aplican también sobre bases ya creadas).
+-- ---------------------------------------------------------------------------
+
+-- Verificación manual de la licencia por parte de administración. Cuando es
+-- TRUE, el formulario deja avanzar al pago aunque la licencia esté vencida o
+-- próxima a vencer (administración revisó el caso y lo habilitó).
+ALTER TABLE enrollments
+  ADD COLUMN IF NOT EXISTS license_verified BOOLEAN NOT NULL DEFAULT FALSE;
