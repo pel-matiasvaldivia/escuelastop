@@ -28,6 +28,15 @@ export interface Enrollment {
   updated_at: string;
 }
 
+export type ChannelState = 'apagado' | 'iniciando' | 'qr' | 'conectado' | 'error';
+
+export interface WhatsAppStatus {
+  state: ChannelState;
+  qr: string | null;
+  error: string | null;
+  updatedAt: string;
+}
+
 export interface Message {
   id: string;
   direction: 'inbound' | 'outbound';
@@ -195,6 +204,29 @@ export const api = {
       body: JSON.stringify({ sede, notes }),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo guardar el turno');
+    return res.json();
+  },
+
+  // --- WhatsApp: vinculación por QR ---
+  whatsappStatus: () => get<WhatsAppStatus>('/whatsapp/status'),
+
+  async whatsappConnect(): Promise<WhatsAppStatus> {
+    const res = await fetch(`${API_URL}/api/whatsapp/connect`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error('No se pudo iniciar la vinculación');
+    return res.json();
+  },
+
+  async whatsappLogout(): Promise<WhatsAppStatus> {
+    const res = await fetch(`${API_URL}/api/whatsapp/logout`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error('No se pudo cerrar la sesión de WhatsApp');
     return res.json();
   },
 
