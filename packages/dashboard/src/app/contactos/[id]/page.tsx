@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, auth, UnauthorizedError, type Message, type Contact } from '../../../lib/api';
 import FichaAlumno from '../../../components/FichaAlumno';
 
 // Vista de conversación + contacto directo con el alumno desde el panel.
-export default function ContactPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+// En Next 14 `params` es un objeto plano (recién en 15 pasa a ser una Promise).
+// Pasárselo a use() lanza el error de React #438 y rompe la página entera.
+export default function ContactPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [contact, setContact] = useState<Contact | null>(null);

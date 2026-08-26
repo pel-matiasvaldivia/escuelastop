@@ -57,7 +57,14 @@ export default function NuevaInscripcionPage() {
         notes: form.notes || undefined,
         senaCobrada: form.senaCobrada,
       });
-      setResult({ formUrl: res.formUrl, contactId: res.contact.id });
+      // El link se arma con el origen del propio panel: el formulario vive acá
+      // mismo. Así no depende de FORM_BASE_URL, que si está mal configurada en
+      // el backend devuelve un localhost inservible para el alumno.
+      const token = res.enrollment.form_token;
+      const formUrl = token
+        ? `${window.location.origin}/inscripcion/${token}`
+        : res.formUrl;
+      setResult({ formUrl, contactId: res.contact.id });
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         router.replace('/login');
