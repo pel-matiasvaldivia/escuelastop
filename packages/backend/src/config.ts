@@ -34,6 +34,9 @@ export const config = {
     // (pestaña WhatsApp). Con true, además intenta conectarse al arrancar
     // reusando las credenciales guardadas.
     enabled: (process.env.WA_ENABLED ?? 'false') === 'true',
+    // Nivel de log de Baileys: 'silent' (default) evita el ruido no accionable.
+    // Subir a 'debug' solo para diagnosticar.
+    logLevel: process.env.WA_LOG_LEVEL ?? 'silent',
   },
   payments: {
     // 'mercadopago' | 'mock' (mock aprueba al instante, solo para desarrollo)

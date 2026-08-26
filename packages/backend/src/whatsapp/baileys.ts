@@ -7,11 +7,35 @@ import {
 import { Boom } from '@hapi/boom';
 import { rm } from 'node:fs/promises';
 import { toDataURL } from 'qrcode';
+import { config } from '../config.js';
 import type {
   MessagingChannel, MessageHandler, ChannelStatus, ChannelState,
 } from './channel.js';
 
 const SESSION_PATH = './whatsapp-session';
+
+/**
+ * Logger para Baileys. Por defecto silencioso: la librería emite mucho ruido de
+ * nivel error que no es accionable (p.ej. no poder descifrar los estados de los
+ * contactos). El ciclo de vida útil (conectado, reconectando, QR) lo logueamos
+ * nosotros. Se puede subir el detalle con WA_LOG_LEVEL para depurar.
+ */
+const noopLogger = {
+  level: config.whatsapp.logLevel,
+  fatal: () => {}, error: () => {}, warn: () => {},
+  info: () => {}, debug: () => {}, trace: () => {},
+  child: () => noopLogger,
+};
+
+/** Solo nos interesan los chats individuales: ni grupos, ni estados, ni newsletters. */
+function shouldIgnoreJid(jid: string): boolean {
+  return (
+    jid === 'status@broadcast' ||
+    jid.endsWith('@g.us') ||
+    jid.endsWith('@broadcast') ||
+    jid.endsWith('@newsletter')
+  );
+}
 
 /**
  * Canal de WhatsApp con Baileys.
@@ -67,6 +91,9 @@ export class BaileysChannel implements MessagingChannel {
         printQRInTerminal: false,
         browser: ['Escuela STOP', 'Chrome', '1.0.0'],
         syncFullHistory: false,
+        // Evita procesar (y fallar al descifrar) estados y grupos.
+        shouldIgnoreJid,
+        logger: noopLogger,
       });
       this.sock = sock;
 
@@ -115,8 +142,8 @@ export class BaileysChannel implements MessagingChannel {
         if (type !== 'notify') return;
         for (const msg of messages) {
           const jid = msg.key.remoteJid;
-          // Ignorar mensajes propios, de grupos y de estados.
-          if (!jid || msg.key.fromMe || jid.endsWith('@g.us') || jid === 'status@broadcast') continue;
+          // Ignorar mensajes propios y todo lo que no sea un chat individual.
+          if (!jid || msg.key.fromMe || shouldIgnoreJid(jid)) continue;
 
           const body =
             msg.message?.conversation ??

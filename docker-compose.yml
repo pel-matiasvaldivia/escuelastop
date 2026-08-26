@@ -57,6 +57,7 @@ services:
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
       MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
       WA_ENABLED: ${WA_ENABLED:-false}
+      WA_LOG_LEVEL: ${WA_LOG_LEVEL:-silent}
     ports:
       - "${PORT}:3001"
     volumes:
