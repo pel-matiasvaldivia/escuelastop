@@ -59,6 +59,10 @@ services:
       WA_ENABLED: ${WA_ENABLED:-false}
       WA_SESSION_ID: ${WA_SESSION_ID:-escuelastop}
       WA_HEADLESS: ${WA_HEADLESS:-true}
+      # Usa el Chromium del sistema en vez del que descarga puppeteer.
+      WA_USE_CHROME: ${WA_USE_CHROME:-true}
+      # Flags de Chromium separados por coma (vacío = preset de contenedor).
+      WA_CHROMIUM_ARGS: ${WA_CHROMIUM_ARGS:-}
     ports:
       - "${PORT}:3001"
     # Chromium (open-wa) crashea con los 64 MB de /dev/shm que trae Docker.

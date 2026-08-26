@@ -33,7 +33,10 @@ export interface PreflightResult {
  * "Failed to launch the browser process! undefined", que no dice nada; esto
  * devuelve el error real (librería faltante, permisos, etc.).
  */
-export async function preflightChromium(execPath: string): Promise<PreflightResult> {
+export async function preflightChromium(
+  execPath: string,
+  args: string[] = DOCKER_CHROMIUM_ARGS,
+): Promise<PreflightResult> {
   try {
     await access(execPath, constants.X_OK);
   } catch {
@@ -50,7 +53,7 @@ export async function preflightChromium(execPath: string): Promise<PreflightResu
 
     // --version puede funcionar aunque falte algo para renderizar: probamos un
     // arranque headless real, que es lo que hará open-wa.
-    await run(execPath, [...DOCKER_CHROMIUM_ARGS, '--headless=new', '--dump-dom', 'about:blank'], {
+    await run(execPath, [...args, '--headless=new', '--dump-dom', 'about:blank'], {
       timeout: 30_000,
     });
 

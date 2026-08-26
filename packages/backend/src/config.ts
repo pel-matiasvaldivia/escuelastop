@@ -40,6 +40,16 @@ export const config = {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     // true dentro de contenedores (agrega --no-sandbox a Chromium).
     docker: (process.env.WA_DOCKER ?? 'false') === 'true',
+    // Le dice a open-wa que use el navegador del sistema (executablePath) en
+    // vez del Chromium que descarga puppeteer. Por defecto true cuando hay
+    // executablePath: sin esto puppeteer intenta lanzar un binario inexistente
+    // y falla con "Failed to launch the browser process! undefined".
+    useChrome: (process.env.WA_USE_CHROME ?? 'true') === 'true',
+    // Flags extra de Chromium, separados por coma. Vacío = usar los del preset
+    // de Docker. Permite ajustar sin reconstruir la imagen (open-wa avisa que
+    // ciertos flags pueden interferir con multi-device).
+    chromiumArgs: (process.env.WA_CHROMIUM_ARGS ?? '')
+      .split(',').map((a) => a.trim()).filter(Boolean),
   },
   payments: {
     // 'mercadopago' | 'mock' (mock aprueba al instante, solo para desarrollo)
