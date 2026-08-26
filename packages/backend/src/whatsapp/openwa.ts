@@ -52,13 +52,11 @@ export class OpenWaChannel implements MessagingChannel {
   }
 
   private async launch(onMessage: MessageHandler): Promise<void> {
-    // Flags de Chromium: los de WA_CHROMIUM_ARGS si se definieron, si no el
-    // preset de contenedor.
-    const chromiumArgs = config.whatsapp.chromiumArgs.length
-      ? config.whatsapp.chromiumArgs
-      : config.whatsapp.docker
-        ? DOCKER_CHROMIUM_ARGS
-        : [];
+    // open-wa YA incluye --no-sandbox, --disable-setuid-sandbox y
+    // --disable-dev-shm-usage en sus args por defecto, y avisa que los flags
+    // custom interfieren con multi-device. Por eso solo pasamos los que se
+    // definan explícitamente en WA_CHROMIUM_ARGS.
+    const chromiumArgs = config.whatsapp.chromiumArgs;
 
     try {
       // Preflight: si Chromium no puede arrancar, open-wa reporta un error vacío
@@ -71,6 +69,10 @@ export class OpenWaChannel implements MessagingChannel {
         }
         console.log(`🌐 Chromium OK: ${check.version}`);
       }
+
+      // Un Chromium que murió deja locks en el perfil; con ellos el siguiente
+      // arranque termina al instante ("Failed to launch ... undefined").
+      await clearStaleProfileLocks(config.whatsapp.sessionId);
 
       this.client = await create({
         sessionId: config.whatsapp.sessionId,
@@ -136,6 +138,18 @@ export class OpenWaChannel implements MessagingChannel {
     await rm(SESSION_PATH, { recursive: true, force: true }).catch(() => {});
     this.setState('apagado', { qr: null, error: null });
   }
+}
+
+/**
+ * Borra los archivos de bloqueo que Chromium deja en el perfil cuando el
+ * proceso no cierra limpio. Si quedan, el siguiente arranque falla en seco.
+ */
+async function clearStaleProfileLocks(sessionId: string): Promise<void> {
+  const profileDir = `${SESSION_PATH}/_IGNORE_${sessionId}`;
+  const locks = ['SingletonLock', 'SingletonSocket', 'SingletonCookie'];
+  await Promise.all(
+    locks.map((name) => rm(`${profileDir}/${name}`, { force: true }).catch(() => {})),
+  );
 }
 
 /** open-wa puede devolver el QR con o sin el prefijo data URI. */

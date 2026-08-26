@@ -53,7 +53,7 @@ export default function WhatsAppPage() {
   }
 
   async function logout() {
-    if (!confirm('¿Desvincular el número? Vas a tener que escanear el QR de nuevo.')) return;
+    if (!confirm('¿Limpiar la sesión? Vas a tener que escanear el QR de nuevo.')) return;
     setBusy(true);
     setError(null);
     try {
@@ -137,7 +137,9 @@ export default function WhatsAppPage() {
             </p>
             <pre style={errorBox}>{status?.error}</pre>
             <p style={{ fontSize: 13, color: '#64748b' }}>
-              Probá de nuevo. Si el error persiste, revisá los logs del backend.
+              Probá <strong>Limpiar sesión</strong> y volvé a vincular: un perfil de
+              navegador a medio cerrar suele causar esto. Si persiste, revisá los
+              logs del backend.
             </p>
           </div>
         )}
@@ -148,9 +150,9 @@ export default function WhatsAppPage() {
               {state === 'qr' ? 'Regenerar QR' : 'Vincular WhatsApp'}
             </button>
           )}
-          {(state === 'conectado' || state === 'qr') && (
+          {state !== 'iniciando' && (
             <button onClick={logout} disabled={busy} style={dangerBtn}>
-              Desvincular
+              {state === 'conectado' ? 'Desvincular' : 'Limpiar sesión'}
             </button>
           )}
         </div>
