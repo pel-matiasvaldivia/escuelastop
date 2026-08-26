@@ -122,6 +122,16 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
   del backend **alcanzable desde el navegador** del operador. En las imágenes de
   GHCR se toma de la variable de repositorio `NEXT_PUBLIC_API_URL`.
 
+### Vincular WhatsApp desde el panel
+
+El panel tiene una pestaña **WhatsApp** (`/whatsapp`) que muestra el **código QR**
+para escanear desde el celular del número de la escuela — no hace falta buscarlo
+en los logs. Estados: desconectado → iniciando → esperando escaneo → conectado.
+Desde ahí también se puede **desvincular** el número.
+
+Con `WA_ENABLED=true` el canal además intenta conectarse solo al arrancar
+(útil cuando la sesión ya está guardada en el volumen `wa_session`).
+
 > ⚠️ **WhatsApp en Docker:** la imagen del backend incluye Chromium y corre
 > open-wa con `--no-sandbox`. La primera vinculación necesita escanear el QR
 > (mirá los logs con `docker compose logs -f backend`) y la sesión queda

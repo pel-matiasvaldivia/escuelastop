@@ -14,7 +14,7 @@ import { evaluateLicense } from '../services/license.js';
 import { extractLicenseExpiry } from '../agent/vision.js';
 import { login } from '../services/auth.js';
 import { requireAuth } from '../middleware/auth.js';
-import type { MessagingChannel } from '../whatsapp/channel.js';
+import type { MessagingChannel, MessageHandler } from '../whatsapp/channel.js';
 import { COURSES, getCourse } from '../agent/catalog.js';
 import { paymentProvider } from '../payments/index.js';
 import { MockPaymentProvider } from '../payments/mock.js';
@@ -35,8 +35,33 @@ const upload = multer({
 });
 const DOC_FIELDS: DocumentKind[] = ['foto_licencia', 'foto_dni', 'apto_medico'];
 
-export function makeApiRouter(channel: MessagingChannel): Router {
+export function makeApiRouter(
+  channel: MessagingChannel,
+  onIncoming: MessageHandler,
+): Router {
   const router = Router();
+
+  // ============ WhatsApp: vinculación por QR desde el panel ============
+  // El QR se muestra en el dashboard (pestaña WhatsApp) para escanearlo con el
+  // celular. Solo administración.
+  router.get('/whatsapp/status', requireAuth, (_req, res) => {
+    res.json(channel.getStatus());
+  });
+
+  // Inicia la vinculación. No esperamos a que termine: el QR aparece en el
+  // estado apenas open-wa lo genera y el panel lo consulta por polling.
+  router.post('/whatsapp/connect', requireAuth, (_req, res) => {
+    void channel.start(onIncoming).catch((err) => {
+      console.error('Error iniciando el canal de WhatsApp:', err);
+    });
+    res.json(channel.getStatus());
+  });
+
+  // Cierra la sesión y borra las credenciales (para vincular otro número).
+  router.post('/whatsapp/logout', requireAuth, async (_req, res) => {
+    await channel.logout();
+    res.json(channel.getStatus());
+  });
 
   // --- Autenticación del dashboard (pública: es el punto de entrada) ---
   router.post('/auth/login', async (req, res) => {
