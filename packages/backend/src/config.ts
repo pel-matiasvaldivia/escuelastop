@@ -30,26 +30,10 @@ export const config = {
     model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5',
   },
   whatsapp: {
-    // Apagado por defecto: el bot de WhatsApp se prende explícitamente
-    // (WA_ENABLED=true) para vincular el número. Así el backend arranca limpio.
+    // Apagado por defecto: el canal se vincula explícitamente desde el panel
+    // (pestaña WhatsApp). Con true, además intenta conectarse al arrancar
+    // reusando las credenciales guardadas.
     enabled: (process.env.WA_ENABLED ?? 'false') === 'true',
-    sessionId: process.env.WA_SESSION_ID ?? 'escuelastop',
-    headless: (process.env.WA_HEADLESS ?? 'true') === 'true',
-    // Ruta a Chromium (en Docker se instala por apt); si no se define, open-wa
-    // usa el navegador que descarga puppeteer.
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    // true dentro de contenedores (agrega --no-sandbox a Chromium).
-    docker: (process.env.WA_DOCKER ?? 'false') === 'true',
-    // Le dice a open-wa que use el navegador del sistema (executablePath) en
-    // vez del Chromium que descarga puppeteer. Por defecto true cuando hay
-    // executablePath: sin esto puppeteer intenta lanzar un binario inexistente
-    // y falla con "Failed to launch the browser process! undefined".
-    useChrome: (process.env.WA_USE_CHROME ?? 'true') === 'true',
-    // Flags extra de Chromium, separados por coma. Vacío = usar los del preset
-    // de Docker. Permite ajustar sin reconstruir la imagen (open-wa avisa que
-    // ciertos flags pueden interferir con multi-device).
-    chromiumArgs: (process.env.WA_CHROMIUM_ARGS ?? '')
-      .split(',').map((a) => a.trim()).filter(Boolean),
   },
   payments: {
     // 'mercadopago' | 'mock' (mock aprueba al instante, solo para desarrollo)

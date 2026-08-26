@@ -11,7 +11,7 @@ contacto directo con quienes escribieron.
 ```
 ┌──────────────┐   mensajes   ┌───────────────────────────┐
 │  WhatsApp    │◄────────────►│  Backend (Node + TS)      │
-│  (open-wa)   │              │  - Canal WhatsApp         │
+│  (Baileys)   │              │  - Canal WhatsApp         │
 └──────────────┘              │  - Agente (Claude)        │
                               │  - API REST               │
 ┌──────────────┐   REST       │                           │      ┌────────────┐
@@ -21,7 +21,7 @@ contacto directo con quienes escribieron.
 ```
 
 - **`packages/backend`** — API + canal de WhatsApp + agente Claude.
-  - `whatsapp/` — canal detrás de la interfaz `MessagingChannel` (hoy `open-wa`;
+  - `whatsapp/` — canal detrás de la interfaz `MessagingChannel` (hoy `Baileys`;
     mañana Meta Cloud API sin tocar el resto).
   - `agent/` — integración con Claude y **base de conocimiento** de STOP.
   - `services/` — acceso a datos (contactos, mensajes, inscripciones).
@@ -29,10 +29,11 @@ contacto directo con quienes escribieron.
   - `db/schema.sql` — esquema de la base.
 - **`packages/dashboard`** — panel de administración en Next.js.
 
-> ⚠️ **Sobre open-wa:** automatiza WhatsApp Web y **no es una API oficial** de
-> Meta. Va contra los Términos de Servicio de WhatsApp y **existe riesgo de baneo
-> del número**. Es adecuado para el MVP; para producción a escala conviene migrar
-> a la **Meta Cloud API** implementando `MessagingChannel` con ese proveedor.
+> ⚠️ **Sobre Baileys:** habla el protocolo multi-device de WhatsApp por WebSocket
+> (sin navegador), pero **no es una API oficial** de Meta. Va contra los Términos
+> de Servicio de WhatsApp y **existe riesgo de baneo del número**. Es adecuado
+> para el MVP; para producción a escala conviene migrar a la **Meta Cloud API**
+> implementando `MessagingChannel` con ese proveedor.
 
 ## Puesta en marcha
 
@@ -63,7 +64,8 @@ WhatsApp del número dedicado para vincular la sesión.
 
 Implementado:
 - Estructura de monorepo, base de datos y configuración.
-- Canal de WhatsApp con open-wa detrás de una interfaz intercambiable.
+- Canal de WhatsApp con **Baileys** (protocolo multi-device por WebSocket, sin
+  navegador) detrás de una interfaz intercambiable.
 - **Catálogo estructurado** de cursos (`agent/catalog.ts`) como única fuente de
   verdad: Particular B1, Profesional Renovación/Ampliación, Solo Prácticas,
   Avanzado, Teoría sola y Alquiler del auto (con turnos, precios, cuotas, seña,
@@ -125,18 +127,17 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ### Vincular WhatsApp desde el panel
 
 El panel tiene una pestaña **WhatsApp** (`/whatsapp`) que muestra el **código QR**
-para escanear desde el celular del número de la escuela — no hace falta buscarlo
-en los logs. Estados: desconectado → iniciando → esperando escaneo → conectado.
-Desde ahí también se puede **desvincular** el número.
+para escanear desde el celular del número de la escuela. Estados: desconectado →
+iniciando → esperando escaneo → conectado. Desde ahí también se puede
+**desvincular** el número.
 
-Con `WA_ENABLED=true` el canal además intenta conectarse solo al arrancar
-(útil cuando la sesión ya está guardada en el volumen `wa_session`).
+Una vez vinculado, poné `WA_ENABLED=true` para que el canal se reconecte solo al
+arrancar reusando las credenciales del volumen `wa_session`.
 
-> ⚠️ **WhatsApp en Docker:** la imagen del backend incluye Chromium y corre
-> open-wa con `--no-sandbox`. La primera vinculación necesita escanear el QR
-> (mirá los logs con `docker compose logs -f backend`) y la sesión queda
-> persistida en el volumen `wa_session`. Para producción a escala, migrar a la
-> Meta Cloud API.
+> ⚠️ **WhatsApp en Docker:** Baileys no necesita navegador, así que la imagen no
+> lleva Chromium. La sesión queda persistida en el volumen `wa_session`, por lo
+> que solo hay que escanear el QR la primera vez. Para producción a escala,
+> migrar a la Meta Cloud API.
 
 ### Imágenes en GHCR
 
@@ -198,7 +199,8 @@ Luego ingresá en `http://localhost:3000/login`. En producción, definí un
 - [ ] **Plantillas de WhatsApp** aprobadas por Meta para mensajes proactivos.
 - [ ] **Métricas** (leads por curso/sede, conversión) y exportación a Excel.
 - [ ] **Cumplimiento Ley 25.326**: consentimiento, política de privacidad, opt-out.
-- [ ] Migración a **Meta Cloud API** para producción.
+- [ ] Migración a **Meta Cloud API** para producción (canal oficial, sin riesgo
+      de baneo; se implementa la misma interfaz `MessagingChannel`).
 
 ## Cursos (fuente de la base de conocimiento)
 
