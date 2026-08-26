@@ -1,13 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
-import { OpenWaChannel } from './whatsapp/openwa.js';
+import { BaileysChannel } from './whatsapp/baileys.js';
 import { makeConversationHandler } from './whatsapp/conversation.js';
 import { makeApiRouter } from './routes/api.js';
 import { seedAdminFromEnv } from './services/auth.js';
 
 async function main() {
-  const channel = new OpenWaChannel();
+  const channel = new BaileysChannel();
 
   // Asegura el usuario admin (ADMIN_EMAIL/ADMIN_PASSWORD) si están definidos.
   await seedAdminFromEnv();
