@@ -14,7 +14,8 @@ async function main() {
 
   // --- API HTTP para el dashboard ---
   const app = express();
-  app.use(cors({ origin: config.dashboardOrigin }));
+  // CORS: refleja el origen solicitado si está en la lista permitida.
+  app.use(cors({ origin: config.corsOrigins }));
   app.use(express.json());
   app.get('/health', (_req, res) => res.json({ ok: true }));
   app.use('/api', makeApiRouter(channel));
