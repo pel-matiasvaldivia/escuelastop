@@ -61,6 +61,8 @@ services:
       WA_HEADLESS: ${WA_HEADLESS:-true}
     ports:
       - "${PORT}:3001"
+    # Chromium (open-wa) crashea con los 64 MB de /dev/shm que trae Docker.
+    shm_size: 1gb
     volumes:
       - uploads:/app/packages/backend/uploads
       - wa_session:/app/packages/backend/whatsapp-session
