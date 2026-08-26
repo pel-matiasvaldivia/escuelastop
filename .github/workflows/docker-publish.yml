@@ -64,7 +64,12 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          push: true
+          # Compresión máxima (gzip -9) y recompresión de todas las capas para
+          # que la imagen publicada pese lo menos posible.
+          outputs: type=image,push=true,compression=gzip,compression-level=9,force-compression=true
+          # Sin attestations: evitan manifests extra en el registro.
+          provenance: false
+          sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
