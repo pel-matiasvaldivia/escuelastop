@@ -4,6 +4,16 @@ import { saveMessage, getChatHistory } from '../services/messages.js';
 import type { IncomingMessage, MessagingChannel } from './channel.js';
 
 /**
+ * Respuesta cuando el agente no puede contestar (sin API key, sin saldo, caída
+ * del servicio). Es preferible avisar que dejar al interesado sin respuesta:
+ * un lead que no recibe nada se pierde.
+ */
+const FALLBACK_REPLY =
+  '¡Hola! Gracias por escribir a la Escuela de Manejo STOP 🚗\n\n' +
+  'En este momento no puedo responderte automáticamente, pero ya registramos ' +
+  'tu consulta y un asesor te va a contactar a la brevedad.';
+
+/**
  * Orquesta una conversación entrante: persiste el mensaje, arma el historial,
  * consulta al agente y responde por el canal.
  *
@@ -13,8 +23,10 @@ import type { IncomingMessage, MessagingChannel } from './channel.js';
  */
 export function makeConversationHandler(channel: MessagingChannel) {
   return async function handleIncoming(msg: IncomingMessage): Promise<void> {
+    let contactId: string | null = null;
     try {
       const contact = await getOrCreateContact(msg.waId, msg.phone);
+      contactId = contact.id;
       await saveMessage(contact.id, 'inbound', 'user', msg.body);
 
       const history = await getChatHistory(contact.id);
@@ -24,6 +36,15 @@ export function makeConversationHandler(channel: MessagingChannel) {
       await channel.sendText(msg.waId, reply);
     } catch (err) {
       console.error('Error procesando mensaje entrante:', err);
+
+      // El lead ya quedó registrado en la base y aparece en el panel; le avisamos
+      // que lo van a contactar para no dejarlo sin respuesta.
+      try {
+        if (contactId) await saveMessage(contactId, 'outbound', 'bot', FALLBACK_REPLY);
+        await channel.sendText(msg.waId, FALLBACK_REPLY);
+      } catch (sendErr) {
+        console.error('Tampoco se pudo enviar el mensaje de respaldo:', sendErr);
+      }
     }
   };
 }
