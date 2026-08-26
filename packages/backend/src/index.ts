@@ -24,13 +24,18 @@ async function main() {
     console.log(`✅ API escuchando en http://localhost:${config.port}`);
   });
 
-  // --- Canal de WhatsApp ---
-  // Escaneá el QR que aparece en la consola la primera vez para vincular el número.
-  const handleIncoming = makeConversationHandler(channel);
-  await channel.start(handleIncoming).catch((err) => {
-    console.error('No se pudo iniciar el canal de WhatsApp:', err);
-    console.error('La API sigue funcionando; el bot de WhatsApp no está activo.');
-  });
+  // --- Canal de WhatsApp (opt-in) ---
+  // Se arranca solo con WA_ENABLED=true. Escaneá el QR de la consola la primera
+  // vez para vincular el número.
+  if (config.whatsapp.enabled) {
+    const handleIncoming = makeConversationHandler(channel);
+    await channel.start(handleIncoming).catch((err) => {
+      console.error('No se pudo iniciar el canal de WhatsApp:', err);
+      console.error('La API sigue funcionando; el bot de WhatsApp no está activo.');
+    });
+  } else {
+    console.log('ℹ️  WhatsApp deshabilitado (WA_ENABLED != true). Solo API activa.');
+  }
 }
 
 main().catch((err) => {
