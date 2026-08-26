@@ -52,12 +52,20 @@ export class OpenWaChannel implements MessagingChannel {
   }
 
   private async launch(onMessage: MessageHandler): Promise<void> {
+    // Flags de Chromium: los de WA_CHROMIUM_ARGS si se definieron, si no el
+    // preset de contenedor.
+    const chromiumArgs = config.whatsapp.chromiumArgs.length
+      ? config.whatsapp.chromiumArgs
+      : config.whatsapp.docker
+        ? DOCKER_CHROMIUM_ARGS
+        : [];
+
     try {
       // Preflight: si Chromium no puede arrancar, open-wa reporta un error vacío
       // ("Failed to launch the browser process! undefined"). Acá obtenemos el
       // motivo real y lo mostramos en el panel.
       if (config.whatsapp.executablePath) {
-        const check = await preflightChromium(config.whatsapp.executablePath);
+        const check = await preflightChromium(config.whatsapp.executablePath, chromiumArgs);
         if (!check.ok) {
           throw new Error(`Chromium no pudo iniciarse: ${check.detail}`);
         }
@@ -75,13 +83,16 @@ export class OpenWaChannel implements MessagingChannel {
         catchQR: (base64Qr: string) => {
           this.setState('qr', { qr: normalizeDataUri(base64Qr), error: null });
         },
-        // En contenedores: usar el Chromium del sistema (executablePath) y
-        // desactivar el sandbox. NO usamos useChrome (buscaría Google Chrome, que
-        // no está instalado; la imagen trae chromium).
+        // En contenedores: usar el navegador del sistema. `useChrome` le indica
+        // a open-wa que NO use el Chromium que descarga puppeteer (que no está
+        // en la imagen: sin esto falla con "Failed to launch ... undefined").
         ...(config.whatsapp.executablePath
-          ? { executablePath: config.whatsapp.executablePath, useChrome: false }
+          ? {
+              executablePath: config.whatsapp.executablePath,
+              useChrome: config.whatsapp.useChrome,
+            }
           : {}),
-        ...(config.whatsapp.docker ? { chromiumArgs: DOCKER_CHROMIUM_ARGS } : {}),
+        ...(chromiumArgs.length ? { chromiumArgs } : {}),
       });
 
       this.client.onMessage(async (message: WaMessage) => {
