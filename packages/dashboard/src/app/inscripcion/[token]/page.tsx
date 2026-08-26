@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, use } from 'react';
-import { api, type Course, type FormFieldKey } from '../../../lib/api';
+import { api, type Course, type FormFieldKey , type SucursalInfo } from '../../../lib/api';
 
 const FIELD_LABELS: Record<FormFieldKey, string> = {
   nombre: 'Nombre y apellido',
@@ -31,6 +31,7 @@ type Step = 'datos' | 'pago' | 'turno' | 'listo' | 'verificacion';
 export default function EnrollmentForm({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [sucursales, setSucursales] = useState<SucursalInfo[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<Record<string, File>>({});
@@ -43,6 +44,7 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
   useEffect(() => {
     (async () => {
       try {
+        api.sucursales().then(setSucursales).catch(() => setSucursales([]));
         const cat = await api.catalog();
         setCourses(cat);
         try {
@@ -175,7 +177,7 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
                   vas a poder elegir <b>sucursal y turno</b>.
                 </p>
               )}
-              {preFields.map((field) => renderField(field, values, setField, setFile))}
+              {preFields.map((field) => renderField(field, values, setField, setFile, sucursales))}
               {needsLicense && (
                 <div>
                   <label style={label}>Vencimiento de la licencia actual *</label>
@@ -219,7 +221,7 @@ export default function EnrollmentForm({ params }: { params: Promise<{ token: st
             <p style={{ ...note, background: '#dcfce7' }}>✅ Seña confirmada. Elegí tu turno.</p>
           )}
           {(postFields.length ? postFields : (['sucursal'] as FormFieldKey[]))
-            .map((field) => renderField(field, values, setField, setFile, course))}
+            .map((field) => renderField(field, values, setField, setFile, sucursales, course))}
           {course.contactSucursal && (
             <p style={note}>⚠️ Esta modalidad se coordina con la sucursal. Te vamos a contactar.</p>
           )}
@@ -261,6 +263,7 @@ function renderField(
   values: Record<string, string>,
   setField: (k: string, v: string) => void,
   setFile: (k: string, file: File) => void,
+  sucursales: SucursalInfo[],
   course?: Course,
 ) {
   if (field === 'turno' && course?.schedules?.length) {
@@ -284,8 +287,11 @@ function renderField(
         <label style={label}>{FIELD_LABELS[field]} *</label>
         <select required value={values.sucursal ?? ''} onChange={(e) => setField('sucursal', e.target.value)} style={input}>
           <option value="">Elegí una sucursal…</option>
-          <option value="Guaymallén">Guaymallén</option>
-          <option value="Las Heras">Las Heras</option>
+          {sucursales.map((suc) => (
+            <option key={suc.id} value={suc.nombre}>
+              {suc.nombre}{suc.direccion ? ` — ${suc.direccion}` : ''}
+            </option>
+          ))}
         </select>
       </div>
     );

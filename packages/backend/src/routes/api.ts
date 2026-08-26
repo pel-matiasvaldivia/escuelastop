@@ -2,7 +2,9 @@ import { Router } from 'express';
 import multer from 'multer';
 import { existsSync, mkdirSync } from 'node:fs';
 import { extname } from 'node:path';
-import { listContacts, updateContact, upsertManualContact } from '../services/contacts.js';
+import {
+  listContacts, updateContact, upsertManualContact, setBotPaused,
+} from '../services/contacts.js';
 import { saveDocument, listDocuments, getDocument, type DocumentKind } from '../services/documents.js';
 import { getConversation, saveMessage } from '../services/messages.js';
 import {
@@ -16,7 +18,7 @@ import { extractLicenseExpiry } from '../agent/vision.js';
 import { login } from '../services/auth.js';
 import { requireAuth } from '../middleware/auth.js';
 import type { MessagingChannel, MessageHandler } from '../whatsapp/channel.js';
-import { COURSES, getCourse } from '../agent/catalog.js';
+import { COURSES, getCourse, SUCURSALES_ACTIVAS } from '../agent/catalog.js';
 import { paymentProvider } from '../payments/index.js';
 import { MockPaymentProvider } from '../payments/mock.js';
 import { config } from '../config.js';
@@ -89,6 +91,12 @@ export function makeApiRouter(
     res.json(COURSES);
   });
 
+  // Sucursales operativas (el formulario y el alta manual arman el select con
+  // esto). Debe ir ANTES de /catalog/:id o el parámetro captura la ruta.
+  router.get('/catalog/sucursales', (_req, res) => {
+    res.json(SUCURSALES_ACTIVAS);
+  });
+
   router.get('/catalog/:id', (req, res) => {
     const course = getCourse(req.params.id);
     if (!course) {
@@ -121,7 +129,20 @@ export function makeApiRouter(
     }
     await channel.sendText(waId, body);
     const saved = await saveMessage(req.params.id, 'outbound', 'agent', body);
+    // Handoff implícito: si un operador escribe, toma la conversación y el bot
+    // deja de responder hasta que se lo reactive desde el panel.
+    await setBotPaused(req.params.id, true);
     res.json(saved);
+  });
+
+  // Handoff explícito: pausar o reanudar el bot para un contacto.
+  router.post('/contacts/:id/bot', requireAuth, async (req, res) => {
+    const { paused } = req.body as { paused?: boolean };
+    if (typeof paused !== 'boolean') {
+      res.status(400).json({ error: 'Falta indicar paused (true/false)' });
+      return;
+    }
+    res.json(await setBotPaused(req.params.id, paused));
   });
 
   // Inscripciones de un contacto (ficha del alumno en el panel).

@@ -29,6 +29,13 @@ export function makeConversationHandler(channel: MessagingChannel) {
       contactId = contact.id;
       await saveMessage(contact.id, 'inbound', 'user', msg.body);
 
+      // Handoff a humano: si un operador tomó la conversación, el mensaje queda
+      // registrado y visible en el panel, pero el bot no contesta.
+      if (contact.bot_paused) {
+        console.log(`⏸️  Bot pausado para ${msg.phone}: responde un operador.`);
+        return;
+      }
+
       const history = await getChatHistory(contact.id);
       const reply = await generateReply(history, contact.id);
 

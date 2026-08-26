@@ -97,3 +97,10 @@ CREATE TABLE IF NOT EXISTS admin_users (
 -- próxima a vencer (administración revisó el caso y lo habilitó).
 ALTER TABLE enrollments
   ADD COLUMN IF NOT EXISTS license_verified BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Handoff a humano: cuando un operador toma la conversación, el bot deja de
+-- responder a ese contacto hasta que se lo reactive desde el panel.
+ALTER TABLE contacts
+  ADD COLUMN IF NOT EXISTS bot_paused BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE contacts
+  ADD COLUMN IF NOT EXISTS bot_paused_at TIMESTAMPTZ;

@@ -1,4 +1,4 @@
-import { COURSES, type Course } from './catalog.js';
+import { COURSES, type Course , SUCURSALES_ACTIVAS, type SucursalInfo } from './catalog.js';
 
 /**
  * Base de conocimiento de la Escuela de Manejo STOP.
@@ -48,6 +48,11 @@ function courseToText(c: Course): string {
   return lines.join('\n');
 }
 
+/** Una línea por sucursal; la dirección solo se publica si está cargada. */
+function sucursalToText(s: SucursalInfo): string {
+  return `- Sucursal ${s.nombre}${s.direccion ? ` — ${s.direccion}` : ''}.`;
+}
+
 export const KNOWLEDGE_BASE = `
 # Escuela de Manejo STOP — Información oficial
 
@@ -61,9 +66,9 @@ y atención personalizada.
 - Email: escuelastop@gmail.com
 
 ## Sucursales
-- Sucursal Guaymallén.
-- Sucursal Las Heras.
-(Los turnos pueden variar según la sucursal. Confirmar direcciones exactas.)
+${SUCURSALES_ACTIVAS.map(sucursalToText).join('\n')}
+(Solo se ofrecen las sucursales listadas arriba. Si preguntan por otra, aclarar
+que por el momento no está disponible.)
 
 # ====================== CURSOS ======================
 
