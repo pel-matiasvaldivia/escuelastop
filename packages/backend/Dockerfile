@@ -7,7 +7,7 @@
 # ---------------------------------------------------------------------------
 
 # ---- Stage 1: build (compila TypeScript a dist/) ----
-FROM node:20-slim AS builder
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 # No hace falta descargar Chromium para compilar; se agrega en el runtime.
@@ -26,16 +26,21 @@ COPY packages/backend ./packages/backend
 RUN npm run build --workspace @escuelastop/backend
 
 # ---- Stage 2: runtime ----
-FROM node:20-slim AS runtime
+FROM node:20-bookworm-slim AS runtime
 WORKDIR /app/packages/backend
 ENV NODE_ENV=production \
     PORT=3001 \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     WA_DOCKER=true
 
-# Chromium + fuentes para open-wa (WhatsApp Web). tini para manejar señales.
+# Chromium + librerías que necesita en headless + fuentes para open-wa
+# (WhatsApp Web). tini para manejar señales.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      chromium fonts-liberation ca-certificates tini \
+      chromium ca-certificates tini \
+      fonts-liberation fonts-noto-color-emoji \
+      libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+      libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+      libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Dependencias ya instaladas y el build.

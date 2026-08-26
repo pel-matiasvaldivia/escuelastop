@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import type {
   MessagingChannel, MessageHandler, ChannelStatus, ChannelState,
 } from './channel.js';
+import { preflightChromium, DOCKER_CHROMIUM_ARGS } from './chromium.js';
 
 const SESSION_PATH = './whatsapp-session';
 
@@ -52,6 +53,17 @@ export class OpenWaChannel implements MessagingChannel {
 
   private async launch(onMessage: MessageHandler): Promise<void> {
     try {
+      // Preflight: si Chromium no puede arrancar, open-wa reporta un error vacío
+      // ("Failed to launch the browser process! undefined"). Acá obtenemos el
+      // motivo real y lo mostramos en el panel.
+      if (config.whatsapp.executablePath) {
+        const check = await preflightChromium(config.whatsapp.executablePath);
+        if (!check.ok) {
+          throw new Error(`Chromium no pudo iniciarse: ${check.detail}`);
+        }
+        console.log(`🌐 Chromium OK: ${check.version}`);
+      }
+
       this.client = await create({
         sessionId: config.whatsapp.sessionId,
         headless: config.whatsapp.headless,
@@ -69,9 +81,7 @@ export class OpenWaChannel implements MessagingChannel {
         ...(config.whatsapp.executablePath
           ? { executablePath: config.whatsapp.executablePath, useChrome: false }
           : {}),
-        ...(config.whatsapp.docker
-          ? { chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox'] }
-          : {}),
+        ...(config.whatsapp.docker ? { chromiumArgs: DOCKER_CHROMIUM_ARGS } : {}),
       });
 
       this.client.onMessage(async (message: WaMessage) => {
