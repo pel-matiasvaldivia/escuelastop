@@ -32,3 +32,15 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   req.admin = payload;
   next();
 }
+
+/**
+ * Restringe una ruta al rol 'admin'. Debe usarse SIEMPRE después de requireAuth
+ * (asume que req.admin ya está poblado). Los operadores reciben 403.
+ */
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (req.admin?.role !== 'admin') {
+    res.status(403).json({ error: 'Requiere permisos de administrador' });
+    return;
+  }
+  next();
+}

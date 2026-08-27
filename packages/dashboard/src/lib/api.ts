@@ -97,11 +97,17 @@ export interface Course {
 
 // ------------------------------ Sesión -------------------------------------
 const TOKEN_KEY = 'stop_token';
+const USER_KEY = 'stop_user';
+
+export type AdminRole = 'admin' | 'operador';
 
 export interface AdminUser {
   id: string;
   email: string;
-  role: 'admin' | 'operador';
+  role: AdminRole;
+  /** Sucursal del operador; null para el admin (ve todas). */
+  sucursal: string | null;
+  created_at?: string;
 }
 
 export const auth = {
@@ -123,12 +129,33 @@ export const auth = {
   clearToken(): void {
     try {
       window.localStorage.removeItem(TOKEN_KEY);
+      window.localStorage.removeItem(USER_KEY);
     } catch {
       /* noop */
     }
   },
   isAuthenticated(): boolean {
     return !!this.getToken();
+  },
+  /** Usuario autenticado (rol + sucursal), cacheado del login para la UI. */
+  getUser(): AdminUser | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = window.localStorage.getItem(USER_KEY);
+      return raw ? (JSON.parse(raw) as AdminUser) : null;
+    } catch {
+      return null;
+    }
+  },
+  setUser(user: AdminUser): void {
+    try {
+      window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    } catch {
+      /* noop */
+    }
+  },
+  isAdmin(): boolean {
+    return this.getUser()?.role === 'admin';
   },
 };
 
@@ -174,11 +201,69 @@ export const api = {
     if (!res.ok) throw new Error('No se pudo iniciar sesión');
     const data = (await res.json()) as { token: string; user: AdminUser };
     auth.setToken(data.token);
+    auth.setUser(data.user);
     return data;
   },
 
   logout(): void {
     auth.clearToken();
+  },
+
+  /** Refresca el usuario autenticado desde el backend (rol + sucursal). */
+  async me(): Promise<AdminUser> {
+    const user = await get<AdminUser>('/auth/me');
+    auth.setUser(user);
+    return user;
+  },
+
+  // --- Gestor de usuarios (solo admin) ---
+  users: () => get<AdminUser[]>('/admin/users'),
+
+  async createUser(data: {
+    email: string; password: string; role: AdminRole; sucursal?: string | null;
+  }): Promise<AdminUser> {
+    const res = await fetch(`${API_URL}/api/admin/users`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo crear el usuario');
+    return res.json();
+  },
+
+  async updateUser(id: string, data: {
+    role?: AdminRole; sucursal?: string | null; password?: string;
+  }): Promise<AdminUser> {
+    const res = await fetch(`${API_URL}/api/admin/users/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo actualizar el usuario');
+    return res.json();
+  },
+
+  async deleteUser(id: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/admin/users/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo eliminar el usuario');
+  },
+
+  /** Reasigna una inscripción a otra sucursal (solo admin). */
+  async assignSucursal(enrollmentId: string, sede: string): Promise<Enrollment> {
+    const res = await fetch(`${API_URL}/api/enrollments/${enrollmentId}/assign`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ sede }),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo reasignar la sucursal');
+    return res.json();
   },
 
   contacts: () => get<Contact[]>('/contacts'),

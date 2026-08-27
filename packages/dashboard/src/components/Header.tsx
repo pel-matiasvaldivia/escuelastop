@@ -3,22 +3,27 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { api, auth } from '../lib/api';
+import { api, auth, type AdminUser } from '../lib/api';
 
 // Barra superior del panel; muestra "Salir" cuando hay sesión iniciada.
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [loggedIn, setLoggedIn] = useState(false);
+  const [user, setUser] = useState<AdminUser | null>(null);
 
   // Recalcula el estado de sesión en cada navegación.
   useEffect(() => {
     setLoggedIn(auth.isAuthenticated());
+    setUser(auth.getUser());
   }, [pathname]);
+
+  const isAdmin = user?.role === 'admin';
 
   function logout() {
     api.logout();
     setLoggedIn(false);
+    setUser(null);
     router.replace('/login');
   }
 
@@ -36,19 +41,35 @@ export default function Header() {
           <nav style={{ display: 'flex', gap: 4 }}>
             <Tab href="/" label="Inscripciones" active={pathname === '/'} />
             <Tab href="/whatsapp" label="WhatsApp" active={pathname === '/whatsapp'} />
+            {isAdmin && (
+              <Tab href="/usuarios" label="Usuarios" active={pathname === '/usuarios'} />
+            )}
           </nav>
         )}
       </div>
       {loggedIn && pathname !== '/login' && (
-        <button
-          onClick={logout}
-          style={{
-            background: 'transparent', color: '#cbd5e1', border: '1px solid #334155',
-            borderRadius: 8, padding: '6px 14px', fontSize: 14, cursor: 'pointer',
-          }}
-        >
-          Salir
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {user && (
+            <span style={{ fontSize: 13, fontWeight: 400, color: '#94a3b8' }}>
+              {user.email}
+              <span style={{
+                marginLeft: 8, padding: '2px 8px', borderRadius: 10, fontSize: 11,
+                background: isAdmin ? '#7c3aed' : '#0891b2', color: '#fff',
+              }}>
+                {isAdmin ? 'Admin' : `Sucursal ${user.sucursal ?? '—'}`}
+              </span>
+            </span>
+          )}
+          <button
+            onClick={logout}
+            style={{
+              background: 'transparent', color: '#cbd5e1', border: '1px solid #334155',
+              borderRadius: 8, padding: '6px 14px', fontSize: 14, cursor: 'pointer',
+            }}
+          >
+            Salir
+          </button>
+        </div>
       )}
     </header>
   );

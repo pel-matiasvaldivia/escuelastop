@@ -3,15 +3,21 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, auth, UnauthorizedError, type Contact, type Enrollment } from '../lib/api';
+import {
+  api, auth, UnauthorizedError,
+  type Contact, type Enrollment, type SucursalInfo,
+} from '../lib/api';
 
 // Panel principal: bandeja de inscripciones + leads recientes.
 export default function HomePage() {
   const router = useRouter();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [sucursales, setSucursales] = useState<SucursalInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const isAdmin = auth.isAdmin();
 
   useEffect(() => {
     if (!auth.isAuthenticated()) {
@@ -20,9 +26,12 @@ export default function HomePage() {
     }
     (async () => {
       try {
-        const [e, c] = await Promise.all([api.enrollments(), api.contacts()]);
+        const [e, c, s] = await Promise.all([
+          api.enrollments(), api.contacts(), api.sucursales(),
+        ]);
         setEnrollments(e);
         setContacts(c);
+        setSucursales(s);
       } catch (err) {
         if (err instanceof UnauthorizedError) {
           router.replace('/login');
@@ -35,6 +44,17 @@ export default function HomePage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reasignar una inscripción a otra sucursal (solo admin).
+  async function reassign(enrollmentId: string, sede: string) {
+    if (!sede) return;
+    try {
+      const updated = await api.assignSucursal(enrollmentId, sede);
+      setEnrollments((prev) => prev.map((e) => (e.id === enrollmentId ? updated : e)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo reasignar');
+    }
+  }
 
   if (loading) return <p style={{ color: '#64748b' }}>Cargando…</p>;
   if (error) return <p style={{ color: '#b91c1c' }}>{error}</p>;
@@ -70,7 +90,22 @@ export default function HomePage() {
             {enrollments.map((e) => (
               <tr key={e.id}>
                 <td style={td}>{e.course ?? '—'}</td>
-                <td style={td}>{e.sede ?? '—'}</td>
+                <td style={td}>
+                  {isAdmin ? (
+                    <select
+                      value={e.sede ?? ''}
+                      onChange={(ev) => reassign(e.id, ev.target.value)}
+                      style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 }}
+                    >
+                      <option value="" disabled>Sin sucursal</option>
+                      {sucursales.map((s) => (
+                        <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    e.sede ?? '—'
+                  )}
+                </td>
                 <td style={td}><StatusBadge status={e.status} /></td>
                 <td style={td}>{new Date(e.updated_at).toLocaleString('es-AR')}</td>
               </tr>

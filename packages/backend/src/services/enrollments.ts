@@ -38,16 +38,63 @@ export async function createEnrollment(
   return res.rows[0];
 }
 
-export async function listEnrollments(status?: EnrollmentStatus): Promise<Enrollment[]> {
-  if (status) {
-    const res = await query<Enrollment>(
-      'SELECT * FROM enrollments WHERE status = $1 ORDER BY updated_at DESC',
-      [status],
-    );
-    return res.rows;
+/**
+ * Lista inscripciones para el panel.
+ * - `status`: filtro opcional por estado.
+ * - `sucursal`: scoping por sucursal (operadores). Cuando se pasa, solo devuelve
+ *   inscripciones YA asignadas a esa sede. En el embudo online la sede recién se
+ *   guarda cuando el alumno pagó la seña y eligió turno (estado 'inscripto'), así
+ *   que filtrar por sede equivale a "proceso completo". El admin no pasa sucursal
+ *   y ve todo.
+ */
+export async function listEnrollments(
+  opts: { status?: EnrollmentStatus; sucursal?: string | null } = {},
+): Promise<Enrollment[]> {
+  const conds: string[] = [];
+  const values: unknown[] = [];
+  if (opts.status) {
+    values.push(opts.status);
+    conds.push(`status = $${values.length}`);
   }
-  const res = await query<Enrollment>('SELECT * FROM enrollments ORDER BY updated_at DESC');
+  if (opts.sucursal !== undefined && opts.sucursal !== null) {
+    values.push(opts.sucursal);
+    conds.push(`sede = $${values.length}`);
+  }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  const res = await query<Enrollment>(
+    `SELECT * FROM enrollments ${where} ORDER BY updated_at DESC`,
+    values,
+  );
   return res.rows;
+}
+
+/** ¿La inscripción pertenece a esta sucursal? (autorización de operadores). */
+export async function enrollmentInSucursal(id: string, sucursal: string): Promise<boolean> {
+  const res = await query<{ ok: boolean }>(
+    'SELECT TRUE AS ok FROM enrollments WHERE id = $1 AND sede = $2',
+    [id, sucursal],
+  );
+  return res.rows.length > 0;
+}
+
+/**
+ * Reasigna una inscripción a otra sucursal (solo admin). Deja constancia en las
+ * notas de quién y cuándo hizo el cambio.
+ */
+export async function assignSucursal(
+  id: string, sede: string, reviewer: string,
+): Promise<Enrollment | null> {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const note = `🏢 Reasignada a la sucursal ${sede} por ${reviewer} (${stamp})`;
+  const res = await query<Enrollment>(
+    `UPDATE enrollments
+     SET sede = $2,
+         notes = COALESCE(notes || E'\\n', '') || $3,
+         updated_at = now()
+     WHERE id = $1 RETURNING *`,
+    [id, sede, note],
+  );
+  return res.rows[0] ?? null;
 }
 
 export async function getEnrollmentByToken(token: string): Promise<Enrollment | null> {

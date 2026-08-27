@@ -88,9 +88,35 @@ export async function upsertManualContact(data: {
   return created.rows[0];
 }
 
-export async function listContacts(): Promise<Contact[]> {
+/**
+ * Lista contactos/leads para el panel.
+ * - Sin sucursal (admin): todos los contactos.
+ * - Con sucursal (operador): solo contactos que tienen al menos una inscripción
+ *   asignada a esa sede (los alumnos de su sucursal).
+ */
+export async function listContacts(sucursal?: string | null): Promise<Contact[]> {
+  if (sucursal) {
+    const res = await query<Contact>(
+      `SELECT c.* FROM contacts c
+       WHERE EXISTS (
+         SELECT 1 FROM enrollments e WHERE e.contact_id = c.id AND e.sede = $1
+       )
+       ORDER BY c.updated_at DESC LIMIT 200`,
+      [sucursal],
+    );
+    return res.rows;
+  }
   const res = await query<Contact>('SELECT * FROM contacts ORDER BY updated_at DESC LIMIT 200');
   return res.rows;
+}
+
+/** ¿El contacto tiene alguna inscripción en esta sucursal? (autorización). */
+export async function contactInSucursal(contactId: string, sucursal: string): Promise<boolean> {
+  const res = await query<{ ok: boolean }>(
+    `SELECT TRUE AS ok FROM enrollments WHERE contact_id = $1 AND sede = $2 LIMIT 1`,
+    [contactId, sucursal],
+  );
+  return res.rows.length > 0;
 }
 
 /**

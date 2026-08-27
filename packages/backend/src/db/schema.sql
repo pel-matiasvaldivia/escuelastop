@@ -85,6 +85,9 @@ CREATE TABLE IF NOT EXISTS admin_users (
   email         TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   role          TEXT NOT NULL DEFAULT 'operador' CHECK (role IN ('admin','operador')),
+  -- Sucursal a la que pertenece un operador (nombre exacto de la sucursal, igual
+  -- que enrollments.sede). NULL para el admin, que ve todas las sucursales.
+  sucursal      TEXT,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -104,3 +107,10 @@ ALTER TABLE contacts
   ADD COLUMN IF NOT EXISTS bot_paused BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE contacts
   ADD COLUMN IF NOT EXISTS bot_paused_at TIMESTAMPTZ;
+
+-- Multi-sucursal: un operador solo ve las inscripciones de SU sucursal. El admin
+-- (sucursal NULL) ve todas y puede reasignar inscriptos a otra sucursal.
+ALTER TABLE admin_users
+  ADD COLUMN IF NOT EXISTS sucursal TEXT;
+-- Filtro por sede (scoping por sucursal en el panel).
+CREATE INDEX IF NOT EXISTS idx_enrollments_sede ON enrollments(sede);
