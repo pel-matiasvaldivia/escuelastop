@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { BaileysChannel } from './whatsapp/baileys.js';
 import { makeConversationHandler } from './whatsapp/conversation.js';
 import { makeApiRouter } from './routes/api.js';
+import { makeFase2Router } from './routes/fase2.js';
 import { seedAdminFromEnv } from './services/auth.js';
 import { runMigrations } from './db/migrate.js';
 
@@ -29,6 +30,7 @@ async function main() {
   app.use(express.json());
   app.get('/health', (_req, res) => res.json({ ok: true }));
   app.use('/api', makeApiRouter(channel, handleIncoming));
+  app.use('/api', makeFase2Router());
 
   app.listen(config.port, () => {
     console.log(`✅ API escuchando en http://localhost:${config.port}`);

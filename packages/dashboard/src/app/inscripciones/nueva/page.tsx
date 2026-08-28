@@ -21,9 +21,13 @@ export default function NuevaInscripcionPage() {
   const [result, setResult] = useState<{ formUrl: string; contactId: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // El operador solo carga inscripciones para su propia sucursal (fija).
+  const currentUser = auth.getUser();
+  const lockedSede = currentUser?.role === 'operador' ? (currentUser.sucursal ?? '') : null;
+
   const [form, setForm] = useState({
     fullName: '', phone: '', email: '', dni: '', age: '',
-    courseId: '', sede: '', notes: '', senaCobrada: false,
+    courseId: '', sede: lockedSede ?? '', notes: '', senaCobrada: false,
   });
 
   useEffect(() => {
@@ -169,14 +173,19 @@ export default function NuevaInscripcionPage() {
         </Field>
 
         <Field label="Sucursal">
-          <select value={form.sede} onChange={(e) => set('sede', e.target.value)} style={input}>
-            <option value="">— A definir —</option>
-            {sucursales.map((suc) => (
-              <option key={suc.id} value={suc.nombre}>
-                {suc.nombre}{suc.direccion ? ` — ${suc.direccion}` : ''}
-              </option>
-            ))}
-          </select>
+          {lockedSede !== null ? (
+            <input value={lockedSede || '—'} disabled
+              style={{ ...input, background: '#f1f5f9', color: '#475569' }} />
+          ) : (
+            <select value={form.sede} onChange={(e) => set('sede', e.target.value)} style={input}>
+              <option value="">— A definir —</option>
+              {sucursales.map((suc) => (
+                <option key={suc.id} value={suc.nombre}>
+                  {suc.nombre}{suc.direccion ? ` — ${suc.direccion}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
 
         <Field label="Notas internas">

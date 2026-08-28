@@ -95,13 +95,122 @@ export interface Course {
   contactSucursal?: boolean;
 }
 
+// ------------------------------ Fase 2 -------------------------------------
+
+export interface ExamCategory {
+  key: string;
+  nombre: string;
+}
+
+export interface ExamBank {
+  id: string;
+  categoria: string;
+  nombre: string;
+  descripcion: string | null;
+  preguntas_por_examen: number;
+  nota_minima: number;
+  tiempo_limite_min: number;
+  intentos_max: number;
+  activo: boolean;
+  preguntas: number;
+}
+
+export interface ExamQuestion {
+  id: string;
+  bank_id: string;
+  enunciado: string;
+  opciones: string[];
+  correcta: number;
+  orden: number;
+}
+
+export type TrainingEstado = 'abierto' | 'en_curso' | 'cerrado' | 'cancelado';
+
+export interface TrainingCourse {
+  id: string;
+  nombre: string;
+  course_id: string | null;
+  bank_id: string | null;
+  sede: string | null;
+  instructor_id: string | null;
+  instructor_email?: string | null;
+  banco_categoria?: string | null;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  estado: TrainingEstado;
+  notas: string | null;
+  alumnos?: number;
+}
+
+export type StudentEstado =
+  | 'cursando' | 'teoria_aprobada' | 'teoria_desaprobada' | 'aprobado' | 'desaprobado';
+
+export interface CourseStudent {
+  id: string;
+  training_course_id: string;
+  full_name: string;
+  dni: string;
+  codigo: string;
+  estado: StudentEstado;
+  practica_aprobada: boolean | null;
+  practica_rubrica: { item: string; ok: boolean }[] | null;
+  practica_at: string | null;
+}
+
+export interface ExamSession {
+  id: string;
+  course_student_id: string;
+  estado: 'habilitado' | 'en_curso' | 'entregado' | 'validado' | 'anulado';
+  puntaje: number | null;
+  aprobado: boolean | null;
+  habilitado_at: string;
+  entregado_at: string | null;
+  validado_at: string | null;
+}
+
+export interface Certificate {
+  id: string;
+  serial: string;
+  codigo_verif: string;
+  emitido_por: string;
+  emitido_at: string;
+  anulado: boolean;
+  datos: Record<string, unknown>;
+  verifyUrl: string;
+}
+
+/** Pregunta como la ve el alumno en el kiosco (sin la respuesta correcta). */
+export interface PresentedQuestion {
+  id: string;
+  enunciado: string;
+  opciones: string[];
+}
+
+export interface ExamStart {
+  sessionId: string;
+  alumno: string;
+  curso: string | null;
+  tiempoLimiteMin: number | null;
+  preguntas: PresentedQuestion[];
+}
+
+export type CertVerification =
+  | { valido: true; anulado: boolean; serial: string; datos: Record<string, unknown>; emitido_at: string }
+  | { valido: false };
+
 // ------------------------------ Sesión -------------------------------------
 const TOKEN_KEY = 'stop_token';
+const USER_KEY = 'stop_user';
+
+export type AdminRole = 'admin' | 'operador' | 'instructor';
 
 export interface AdminUser {
   id: string;
   email: string;
-  role: 'admin' | 'operador';
+  role: AdminRole;
+  /** Sucursal del operador; null para el admin (ve todas). */
+  sucursal: string | null;
+  created_at?: string;
 }
 
 export const auth = {
@@ -123,12 +232,33 @@ export const auth = {
   clearToken(): void {
     try {
       window.localStorage.removeItem(TOKEN_KEY);
+      window.localStorage.removeItem(USER_KEY);
     } catch {
       /* noop */
     }
   },
   isAuthenticated(): boolean {
     return !!this.getToken();
+  },
+  /** Usuario autenticado (rol + sucursal), cacheado del login para la UI. */
+  getUser(): AdminUser | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = window.localStorage.getItem(USER_KEY);
+      return raw ? (JSON.parse(raw) as AdminUser) : null;
+    } catch {
+      return null;
+    }
+  },
+  setUser(user: AdminUser): void {
+    try {
+      window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    } catch {
+      /* noop */
+    }
+  },
+  isAdmin(): boolean {
+    return this.getUser()?.role === 'admin';
   },
 };
 
@@ -162,6 +292,39 @@ async function get<T>(path: string): Promise<T> {
   return res.json();
 }
 
+/** Mutación autenticada con cuerpo JSON (POST/PATCH/DELETE). */
+async function send<T>(
+  path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown,
+): Promise<T> {
+  const res = await fetch(`${API_URL}/api${path}`, {
+    method,
+    headers: authHeaders(body !== undefined ? { 'Content-Type': 'application/json' } : undefined),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  handle401(res);
+  if (!res.ok) {
+    let msg = `Error ${res.status}`;
+    try { msg = (await res.json()).error ?? msg; } catch { /* sin cuerpo */ }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+/** Igual que `send` pero sin autenticación (kiosco / verificación pública). */
+async function sendPublic<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}/api${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let msg = `Error ${res.status}`;
+    try { msg = (await res.json()).error ?? msg; } catch { /* sin cuerpo */ }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 export const api = {
   // --- Autenticación ---
   async login(email: string, password: string): Promise<{ token: string; user: AdminUser }> {
@@ -174,11 +337,69 @@ export const api = {
     if (!res.ok) throw new Error('No se pudo iniciar sesión');
     const data = (await res.json()) as { token: string; user: AdminUser };
     auth.setToken(data.token);
+    auth.setUser(data.user);
     return data;
   },
 
   logout(): void {
     auth.clearToken();
+  },
+
+  /** Refresca el usuario autenticado desde el backend (rol + sucursal). */
+  async me(): Promise<AdminUser> {
+    const user = await get<AdminUser>('/auth/me');
+    auth.setUser(user);
+    return user;
+  },
+
+  // --- Gestor de usuarios (solo admin) ---
+  users: () => get<AdminUser[]>('/admin/users'),
+
+  async createUser(data: {
+    email: string; password: string; role: AdminRole; sucursal?: string | null;
+  }): Promise<AdminUser> {
+    const res = await fetch(`${API_URL}/api/admin/users`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo crear el usuario');
+    return res.json();
+  },
+
+  async updateUser(id: string, data: {
+    role?: AdminRole; sucursal?: string | null; password?: string;
+  }): Promise<AdminUser> {
+    const res = await fetch(`${API_URL}/api/admin/users/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo actualizar el usuario');
+    return res.json();
+  },
+
+  async deleteUser(id: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/admin/users/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo eliminar el usuario');
+  },
+
+  /** Reasigna una inscripción a otra sucursal (solo admin). */
+  async assignSucursal(enrollmentId: string, sede: string): Promise<Enrollment> {
+    const res = await fetch(`${API_URL}/api/enrollments/${enrollmentId}/assign`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ sede }),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo reasignar la sucursal');
+    return res.json();
   },
 
   contacts: () => get<Contact[]>('/contacts'),
@@ -330,4 +551,67 @@ export const api = {
     });
     handle401(res);
   },
+
+  // ============================ FASE 2 ============================
+
+  // -- Metadatos y bancos --
+  examCategories: () => get<ExamCategory[]>('/exam-categories'),
+  instructores: () => get<AdminUser[]>('/instructores'),
+  examBanks: () => get<ExamBank[]>('/exam-banks'),
+  bankQuestions: (bankId: string) => get<ExamQuestion[]>(`/exam-banks/${bankId}/questions`),
+  createBank: (data: {
+    categoria: string; nombre: string; descripcion?: string;
+    preguntasPorExamen?: number; notaMinima?: number; tiempoLimiteMin?: number; intentosMax?: number;
+  }) => send<ExamBank>('/exam-banks', 'POST', data),
+  addQuestion: (bankId: string, data: { enunciado: string; opciones: string[]; correcta: number }) =>
+    send<ExamQuestion>(`/exam-banks/${bankId}/questions`, 'POST', data),
+  importQuestions: (bankId: string, preguntas: { enunciado: string; opciones: string[]; correcta: number }[]) =>
+    send<{ importadas: number }>(`/exam-banks/${bankId}/questions/bulk`, 'POST', { preguntas }),
+  deleteQuestion: (id: string) => send<{ ok: boolean }>(`/exam-questions/${id}`, 'DELETE'),
+
+  // -- Comisiones --
+  trainingCourses: () => get<TrainingCourse[]>('/training-courses'),
+  trainingCourse: (id: string) =>
+    get<{ course: TrainingCourse; alumnos: CourseStudent[] }>(`/training-courses/${id}`),
+  createTrainingCourse: (data: {
+    nombre: string; courseId?: string; bankId?: string; sede?: string;
+    instructorId?: string; fechaInicio?: string; fechaFin?: string; notas?: string;
+  }) => send<TrainingCourse>('/training-courses', 'POST', data),
+  updateTrainingCourse: (id: string, data: Partial<{
+    nombre: string; bank_id: string | null; sede: string | null;
+    instructor_id: string | null; estado: TrainingEstado; notas: string | null;
+  }>) => send<TrainingCourse>(`/training-courses/${id}`, 'PATCH', data),
+
+  // -- Alumnos de la comisión --
+  addStudent: (courseId: string, data: { fullName: string; dni: string }) =>
+    send<CourseStudent>(`/training-courses/${courseId}/students`, 'POST', data),
+  removeStudent: (id: string) => send<{ ok: boolean }>(`/students/${id}`, 'DELETE'),
+  studentSessions: (id: string) => get<ExamSession[]>(`/students/${id}/sessions`),
+
+  // -- Examen teórico --
+  enableExam: (studentId: string) => send<ExamSession>(`/students/${studentId}/exam/enable`, 'POST'),
+  validateExam: (sessionId: string) => send<ExamSession>(`/exam-sessions/${sessionId}/validate`, 'POST'),
+
+  // -- Evaluación práctica --
+  setPractica: (studentId: string, rubrica: { item: string; ok: boolean }[], aprobada: boolean) =>
+    send<CourseStudent>(`/students/${studentId}/practica`, 'POST', { rubrica, aprobada }),
+
+  // -- Certificado --
+  issueCertificate: (studentId: string) => send<Certificate>(`/students/${studentId}/certificate`, 'POST'),
+  getCertificate: (studentId: string) => get<Certificate>(`/students/${studentId}/certificate`),
+  /** URL del PDF del certificado (token en la query para poder abrirlo con <a>). */
+  certificatePdfUrl(studentId: string): string {
+    return `${API_URL}/api/students/${studentId}/certificate/pdf?token=${auth.getToken() ?? ''}`;
+  },
+
+  // -- Kiosco público del examen (tablet del alumno) --
+  examStart: (dni: string, codigo: string) =>
+    sendPublic<ExamStart>('/public/exam/start', { dni, codigo }),
+  examSubmit: (sessionId: string, dni: string, codigo: string, respuestas: number[]) =>
+    sendPublic<{ entregado: boolean; puntaje: number; aprobado: boolean }>(
+      `/public/exam/${sessionId}/submit`, { dni, codigo, respuestas },
+    ),
+
+  // -- Verificación pública del certificado (QR) --
+  verifyCertificate: (codigo: string) => get<CertVerification>(`/public/verificar/${codigo}`),
 };
