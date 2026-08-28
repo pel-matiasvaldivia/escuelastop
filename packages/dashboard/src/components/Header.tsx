@@ -46,6 +46,11 @@ export default function Header() {
               active={pathname.startsWith('/capacitaciones')}
             />
             <Tab href="/whatsapp" label="WhatsApp" active={pathname === '/whatsapp'} />
+            <Tab
+              href="/como-funciona"
+              label="Cómo funciona"
+              active={pathname === '/como-funciona'}
+            />
             {isAdmin && (
               <Tab href="/usuarios" label="Usuarios" active={pathname === '/usuarios'} />
             )}
