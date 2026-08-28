@@ -80,9 +80,9 @@ que por el momento no está disponible.)
   coordinan con la administración de la sucursal. Pedile a la persona en qué
   sucursal haría el curso y derivala a la administración de esa sucursal.
 - Encargadas de sucursal:
-  - Carina — encargada de la sucursal Luján. Para consultas de esa sucursal.
-  - Julieta — encargada de la sucursal Terminal. Se le escribe para programar el
-    turno del pago y del curso o las clases.
+  - Carina — encargada de la sucursal LUJAN. Para consultas de esa sucursal.
+  - Julieta — encargada de la sucursal Casa Central (Terminal de Ómnibus). Se le
+    escribe para programar el turno del pago y del curso o las clases.
 - Renovación / revalidación profesional: los resultados se cargan a la aplicación
   lncargentina.seguridadvial.gob.ar al día hábil siguiente e impactan en el
   sistema de 1 a 3 días hábiles.

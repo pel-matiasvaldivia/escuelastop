@@ -10,7 +10,7 @@
  * Fuente: información oficial provista por la escuela.
  */
 
-export type Sucursal = 'Guaymallén' | 'Las Heras' | 'San Martín';
+export type Sucursal = 'Dorrego' | 'Casa Central' | 'LUJAN';
 
 export interface SucursalInfo {
   id: string;
@@ -30,10 +30,26 @@ export interface SucursalInfo {
  * la base de conocimiento del agente se arman a partir de esta lista.
  */
 export const SUCURSALES: SucursalInfo[] = [
-  { id: 'guaymallen', nombre: 'Guaymallén', activa: true },
-  // Desactivadas por ahora; se habilitan poniendo activa: true.
-  { id: 'las-heras', nombre: 'Las Heras', activa: false },
-  { id: 'san-martin', nombre: 'San Martín', activa: false },
+  {
+    id: 'casa-central',
+    nombre: 'Casa Central',
+    direccion:
+      'Reconquista 258, Local 1 (lateral norte, frente a los taxis) — ' +
+      'Terminal de Ómnibus, Mendoza',
+    activa: true,
+  },
+  {
+    id: 'dorrego',
+    nombre: 'Dorrego',
+    direccion: 'Adolfo Calle 1853, Local 9 (esquina Las Cañas) — Dorrego, Guaymallén',
+    activa: true,
+  },
+  {
+    id: 'lujan',
+    nombre: 'LUJAN',
+    direccion: 'Av. San Martín 160, Local 2 — Luján de Cuyo',
+    activa: true,
+  },
 ];
 
 /** Sucursales que hoy se ofrecen al alumno. */
@@ -339,10 +355,10 @@ export const COURSES: Course[] = [
       'Renovación o revalidación de la licencia profesional. Se cursa, se rinde y ' +
       'se aprueba en la escuela. Elegir un solo turno.',
     schedules: [
-      { id: 'reno-1', sucursal: 'Guaymallén', turno: 'Mañana', dias: 'Lunes', horario: '09:00 a 14:00 hs' },
-      { id: 'reno-2', sucursal: 'Guaymallén', turno: 'Tarde', dias: 'Lunes', horario: '15:00 a 20:00 hs' },
-      { id: 'reno-3', sucursal: 'Guaymallén', turno: 'Mañana', dias: 'Miércoles', horario: '09:00 a 14:00 hs' },
-      { id: 'reno-4', sucursal: 'Guaymallén', turno: 'Tarde', dias: 'Miércoles', horario: '15:00 a 20:00 hs' },
+      { id: 'reno-1', sucursal: 'Casa Central', turno: 'Mañana', dias: 'Lunes', horario: '09:00 a 14:00 hs' },
+      { id: 'reno-2', sucursal: 'Casa Central', turno: 'Tarde', dias: 'Lunes', horario: '15:00 a 20:00 hs' },
+      { id: 'reno-3', sucursal: 'Casa Central', turno: 'Mañana', dias: 'Miércoles', horario: '09:00 a 14:00 hs' },
+      { id: 'reno-4', sucursal: 'Casa Central', turno: 'Tarde', dias: 'Miércoles', horario: '15:00 a 20:00 hs' },
     ],
     includes: [
       'Teórico presencial (Curso Nacional) de 5 hs',
@@ -368,9 +384,9 @@ export const COURSES: Course[] = [
     priceNote: 'Consultar valor.',
     description: 'Curso teórico profesional para ampliación. Elegir un solo turno.',
     schedules: [
-      { id: 'amp-1', sucursal: 'Guaymallén', turno: 'Mañana', dias: 'Lunes y Martes', horario: '09:00 a 14:00 hs' },
-      { id: 'amp-2', sucursal: 'Guaymallén', turno: 'Tarde', dias: 'Lunes y Martes', horario: '15:00 a 20:00 hs' },
-      { id: 'amp-3', sucursal: 'Guaymallén', turno: 'Mañana', dias: 'Miércoles y Jueves', horario: '09:00 a 14:00 hs' },
+      { id: 'amp-1', sucursal: 'Casa Central', turno: 'Mañana', dias: 'Lunes y Martes', horario: '09:00 a 14:00 hs' },
+      { id: 'amp-2', sucursal: 'Casa Central', turno: 'Tarde', dias: 'Lunes y Martes', horario: '15:00 a 20:00 hs' },
+      { id: 'amp-3', sucursal: 'Casa Central', turno: 'Mañana', dias: 'Miércoles y Jueves', horario: '09:00 a 14:00 hs' },
     ],
     reserva: RESERVA_PROFESIONAL,
     seniaReserva: 50000,
