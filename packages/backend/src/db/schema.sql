@@ -121,6 +121,13 @@ ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_role_check;
 ALTER TABLE admin_users
   ADD CONSTRAINT admin_users_role_check CHECK (role IN ('admin','operador','instructor'));
 
+-- Plantillas de examen (Fase 2): la comisión puede referenciar una plantilla y
+-- la sesión guarda la nota mínima con la que se habilitó (para bases ya creadas).
+ALTER TABLE training_courses
+  ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES exam_templates(id) ON DELETE SET NULL;
+ALTER TABLE exam_sessions
+  ADD COLUMN IF NOT EXISTS nota_minima INT;
+
 -- ===========================================================================
 -- FASE 2 — Capacitación, evaluación teórica/práctica y certificación.
 --
@@ -161,13 +168,33 @@ CREATE TABLE IF NOT EXISTS exam_questions (
 );
 CREATE INDEX IF NOT EXISTS idx_exam_questions_bank ON exam_questions(bank_id);
 
+-- Plantillas de examen: preset con nombre que toma preguntas de UNA categoría
+-- (bank) y define los parámetros del examen (cuántas preguntas, nota mínima,
+-- tiempo, intentos). Una misma categoría puede tener varias plantillas
+-- (ej: "B1 — examen final" y "B1 — simulacro").
+CREATE TABLE IF NOT EXISTS exam_templates (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre               TEXT NOT NULL,
+  bank_id              UUID NOT NULL REFERENCES exam_banks(id) ON DELETE CASCADE,
+  preguntas_por_examen INT  NOT NULL DEFAULT 10,
+  nota_minima          INT  NOT NULL DEFAULT 70,
+  tiempo_limite_min    INT  NOT NULL DEFAULT 30,
+  intentos_max         INT  NOT NULL DEFAULT 2,
+  activo               BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by           TEXT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_exam_templates_bank ON exam_templates(bank_id);
+
 -- Comisiones / cohortes: una instancia concreta de un curso, en una sucursal, a
 -- cargo de un instructor, con el banco de examen que le corresponde.
 CREATE TABLE IF NOT EXISTS training_courses (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   nombre        TEXT NOT NULL,                -- ej: "B1 — Comisión Agosto Casa Central"
   course_id     TEXT,                         -- id del catálogo (catalog.ts), informativo
-  bank_id       UUID REFERENCES exam_banks(id),
+  bank_id       UUID REFERENCES exam_banks(id),        -- legacy: categoría directa
+  template_id   UUID REFERENCES exam_templates(id) ON DELETE SET NULL, -- plantilla de examen
   sede          TEXT,
   instructor_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
   fecha_inicio  DATE,
@@ -210,6 +237,7 @@ CREATE TABLE IF NOT EXISTS exam_sessions (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   course_student_id UUID NOT NULL REFERENCES course_students(id) ON DELETE CASCADE,
   bank_id           UUID NOT NULL REFERENCES exam_banks(id),
+  nota_minima       INT,                      -- snapshot del % para aprobar al habilitar
   estado            TEXT NOT NULL DEFAULT 'habilitado'
                     CHECK (estado IN ('habilitado','en_curso','entregado','validado','anulado')),
   preguntas         JSONB,                    -- snapshot de las preguntas presentadas

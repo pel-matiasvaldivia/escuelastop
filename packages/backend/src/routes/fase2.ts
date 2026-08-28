@@ -1,19 +1,20 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, requireInstructorOrAdmin } from '../middleware/auth.js';
 import {
   EXAM_CATEGORIES, getCourse, isSucursalActiva,
 } from '../agent/catalog.js';
 import { listInstructores } from '../services/auth.js';
 import {
-  listTrainingCourses, getTrainingCourse, createTrainingCourse, updateTrainingCourse,
-  trainingInSucursal, listStudents, getStudent, studentSucursal, addStudent,
+  listTrainingCourses, getTrainingCourse, getTrainingCourseView, createTrainingCourse,
+  updateTrainingCourse, trainingInSucursal, listStudents, getStudent, studentSucursal, addStudent,
   findStudentByCodigo, removeStudent, setStudentTeoria, setPractica, cerrarAlumno,
 } from '../services/training.js';
 import {
   listBanks, getBank, upsertBank, listQuestions, addQuestion, addQuestionsBulk,
   deleteQuestion, habilitarExamen, getSession, listSessionsByStudent,
   pendingSessionForStudent, iniciarSesion, entregarExamen, validarExamen,
+  listTemplates, getTemplate, createTemplate, updateTemplate, deleteTemplate,
   type PresentedQuestion,
 } from '../services/exams.js';
 import {
@@ -43,16 +44,16 @@ export function makeFase2Router(): Router {
   });
 
   // Instructores disponibles para asignar a una comisión (rol instructor o admin).
-  router.get('/instructores', requireAuth, requireAdmin, async (_req, res) => {
+  router.get('/instructores', requireAuth, requireInstructorOrAdmin, async (_req, res) => {
     res.json(await listInstructores());
   });
 
-  // ======================= BANCOS DE PREGUNTAS (admin) =======================
+  // ============ CATEGORÍAS DE PREGUNTAS / BANCOS (instructor o admin) ============
   router.get('/exam-banks', requireAuth, async (_req, res) => {
     res.json(await listBanks());
   });
 
-  router.post('/exam-banks', requireAuth, requireAdmin, async (req, res) => {
+  router.post('/exam-banks', requireAuth, requireInstructorOrAdmin, async (req, res) => {
     const { categoria, nombre, descripcion, preguntasPorExamen, notaMinima, tiempoLimiteMin, intentosMax } =
       req.body as Record<string, unknown>;
     if (typeof categoria !== 'string' || !categoria.trim() || typeof nombre !== 'string' || !nombre.trim()) {
@@ -71,7 +72,7 @@ export function makeFase2Router(): Router {
     res.status(201).json(bank);
   });
 
-  router.get('/exam-banks/:id/questions', requireAuth, requireAdmin, async (req, res) => {
+  router.get('/exam-banks/:id/questions', requireAuth, requireInstructorOrAdmin, async (req, res) => {
     const bank = await getBank(req.params.id);
     if (!bank) {
       res.status(404).json({ error: 'Banco no encontrado' });
@@ -80,7 +81,7 @@ export function makeFase2Router(): Router {
     res.json(await listQuestions(req.params.id));
   });
 
-  router.post('/exam-banks/:id/questions', requireAuth, requireAdmin, async (req, res) => {
+  router.post('/exam-banks/:id/questions', requireAuth, requireInstructorOrAdmin, async (req, res) => {
     const bank = await getBank(req.params.id);
     if (!bank) {
       res.status(404).json({ error: 'Banco no encontrado' });
@@ -106,7 +107,7 @@ export function makeFase2Router(): Router {
 
   // Importación masiva de preguntas (Excel/CSV parseado en el panel). Recibe un
   // array ya validado y lo inserta en una transacción.
-  router.post('/exam-banks/:id/questions/bulk', requireAuth, requireAdmin, async (req, res) => {
+  router.post('/exam-banks/:id/questions/bulk', requireAuth, requireInstructorOrAdmin, async (req, res) => {
     const bank = await getBank(req.params.id);
     if (!bank) {
       res.status(404).json({ error: 'Banco no encontrado' });
@@ -137,9 +138,67 @@ export function makeFase2Router(): Router {
     res.status(201).json({ importadas: n });
   });
 
-  router.delete('/exam-questions/:id', requireAuth, requireAdmin, async (req, res) => {
+  router.delete('/exam-questions/:id', requireAuth, requireInstructorOrAdmin, async (req, res) => {
     const ok = await deleteQuestion(req.params.id);
     res.json({ ok });
+  });
+
+  // ============ PLANTILLAS DE EXAMEN (instructor o admin) ============
+  // Un preset con nombre que toma preguntas de UNA categoría y fija los
+  // parámetros del examen (cantidad, nota mínima, tiempo, intentos).
+  router.get('/exam-templates', requireAuth, async (_req, res) => {
+    res.json(await listTemplates());
+  });
+
+  router.post('/exam-templates', requireAuth, requireInstructorOrAdmin, async (req, res) => {
+    const { nombre, bankId, preguntasPorExamen, notaMinima, tiempoLimiteMin, intentosMax } =
+      req.body as Record<string, unknown>;
+    if (typeof nombre !== 'string' || !nombre.trim()) {
+      res.status(400).json({ error: 'El nombre de la plantilla es requerido' });
+      return;
+    }
+    if (typeof bankId !== 'string' || !bankId || !(await getBank(bankId))) {
+      res.status(400).json({ error: 'Elegí una categoría de preguntas válida' });
+      return;
+    }
+    const tpl = await createTemplate({
+      nombre: nombre.trim(),
+      bankId,
+      preguntasPorExamen: toInt(preguntasPorExamen),
+      notaMinima: toInt(notaMinima),
+      tiempoLimiteMin: toInt(tiempoLimiteMin),
+      intentosMax: toInt(intentosMax),
+      createdBy: req.admin!.email,
+    });
+    res.status(201).json(tpl);
+  });
+
+  router.patch('/exam-templates/:id', requireAuth, requireInstructorOrAdmin, async (req, res) => {
+    const tpl = await getTemplate(req.params.id);
+    if (!tpl) {
+      res.status(404).json({ error: 'Plantilla no encontrada' });
+      return;
+    }
+    const b = req.body as Record<string, unknown>;
+    const fields: Record<string, unknown> = {};
+    if (typeof b.nombre === 'string' && b.nombre.trim()) fields.nombre = b.nombre.trim();
+    if (typeof b.bankId === 'string' && b.bankId) {
+      if (!(await getBank(b.bankId))) {
+        res.status(400).json({ error: 'Categoría inválida' });
+        return;
+      }
+      fields.bank_id = b.bankId;
+    }
+    const pe = toInt(b.preguntasPorExamen); if (pe !== undefined) fields.preguntas_por_examen = pe;
+    const nm = toInt(b.notaMinima); if (nm !== undefined) fields.nota_minima = nm;
+    const tl = toInt(b.tiempoLimiteMin); if (tl !== undefined) fields.tiempo_limite_min = tl;
+    const im = toInt(b.intentosMax); if (im !== undefined) fields.intentos_max = im;
+    if (typeof b.activo === 'boolean') fields.activo = b.activo;
+    res.json(await updateTemplate(req.params.id, fields));
+  });
+
+  router.delete('/exam-templates/:id', requireAuth, requireInstructorOrAdmin, async (req, res) => {
+    res.json({ ok: await deleteTemplate(req.params.id) });
   });
 
   // =========================== COMISIONES ===========================
@@ -148,7 +207,7 @@ export function makeFase2Router(): Router {
   });
 
   router.post('/training-courses', requireAuth, async (req, res) => {
-    const { nombre, courseId, bankId, sede, instructorId, fechaInicio, fechaFin, notas } =
+    const { nombre, courseId, bankId, templateId, sede, instructorId, fechaInicio, fechaFin, notas } =
       req.body as Record<string, unknown>;
     if (typeof nombre !== 'string' || !nombre.trim()) {
       res.status(400).json({ error: 'El nombre de la comisión es requerido' });
@@ -165,10 +224,15 @@ export function makeFase2Router(): Router {
       res.status(400).json({ error: 'Curso del catálogo inválido' });
       return;
     }
+    if (typeof templateId === 'string' && templateId && !(await getTemplate(templateId))) {
+      res.status(400).json({ error: 'Plantilla de examen inválida' });
+      return;
+    }
     const course = await createTrainingCourse({
       nombre: nombre.trim(),
       courseId: typeof courseId === 'string' ? courseId : null,
       bankId: typeof bankId === 'string' && bankId ? bankId : null,
+      templateId: typeof templateId === 'string' && templateId ? templateId : null,
       sede: sedeFinal ?? null,
       instructorId: typeof instructorId === 'string' && instructorId ? instructorId : null,
       fechaInicio: typeof fechaInicio === 'string' && fechaInicio ? fechaInicio : null,
@@ -180,7 +244,7 @@ export function makeFase2Router(): Router {
 
   // Detalle de una comisión: datos + alumnos.
   router.get('/training-courses/:id', requireAuth, async (req, res) => {
-    const course = await getTrainingCourse(req.params.id);
+    const course = await getTrainingCourseView(req.params.id);
     if (!course) {
       res.status(404).json({ error: 'Comisión no encontrada' });
       return;
@@ -244,11 +308,23 @@ export function makeFase2Router(): Router {
       return;
     }
     const course = await getTrainingCourse(student.training_course_id);
-    if (!course?.bank_id) {
-      res.status(400).json({ error: 'La comisión no tiene un banco de examen asignado' });
+    if (!course) {
+      res.status(404).json({ error: 'Comisión no encontrada' });
       return;
     }
-    const result = await habilitarExamen(req.params.id, course.bank_id, req.admin!.email);
+    // Preferimos la plantilla de la comisión (categoría + parámetros); si no hay,
+    // caemos a la categoría directa (bank_id) por compatibilidad.
+    const tpl = course.template_id ? await getTemplate(course.template_id) : null;
+    const opts = tpl
+      ? { bankId: tpl.bank_id, preguntasPorExamen: tpl.preguntas_por_examen, notaMinima: tpl.nota_minima }
+      : course.bank_id
+        ? { bankId: course.bank_id }
+        : null;
+    if (!opts) {
+      res.status(400).json({ error: 'La comisión no tiene plantilla ni categoría de examen asignada' });
+      return;
+    }
+    const result = await habilitarExamen(req.params.id, opts, req.admin!.email);
     if ('error' in result) {
       res.status(400).json(result);
       return;

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   api, auth, UnauthorizedError,
-  type TrainingCourse, type ExamBank, type AdminUser, type SucursalInfo,
+  type TrainingCourse, type ExamTemplate, type AdminUser, type SucursalInfo,
 } from '../../lib/api';
 
 /**
@@ -15,16 +15,17 @@ import {
 export default function CapacitacionesPage() {
   const router = useRouter();
   const [courses, setCourses] = useState<TrainingCourse[]>([]);
-  const [banks, setBanks] = useState<ExamBank[]>([]);
+  const [templates, setTemplates] = useState<ExamTemplate[]>([]);
   const [sucursales, setSucursales] = useState<SucursalInfo[]>([]);
   const [instructores, setInstructores] = useState<AdminUser[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Formulario de alta.
   const [nombre, setNombre] = useState('');
-  const [bankId, setBankId] = useState('');
+  const [templateId, setTemplateId] = useState('');
   const [sede, setSede] = useState('');
   const [instructorId, setInstructorId] = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
@@ -32,10 +33,12 @@ export default function CapacitacionesPage() {
 
   async function reload() {
     const admin = auth.isAdmin();
+    const role = auth.getUser()?.role;
     setIsAdmin(admin);
-    const [c, b, s] = await Promise.all([api.trainingCourses(), api.examBanks(), api.sucursales()]);
+    setCanManage(admin || role === 'instructor');
+    const [c, t, s] = await Promise.all([api.trainingCourses(), api.examTemplates(), api.sucursales()]);
     setCourses(c);
-    setBanks(b);
+    setTemplates(t);
     setSucursales(s);
     if (!sede && s[0]) setSede(s[0].nombre);
     if (admin) {
@@ -68,7 +71,7 @@ export default function CapacitacionesPage() {
     try {
       const created = await api.createTrainingCourse({
         nombre: nombre.trim(),
-        bankId: bankId || undefined,
+        templateId: templateId || undefined,
         sede: isAdmin ? (sede || undefined) : undefined,
         instructorId: instructorId || undefined,
         fechaInicio: fechaInicio || undefined,
@@ -90,9 +93,9 @@ export default function CapacitacionesPage() {
         <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>
           Comisiones de cursos con evaluación teórica (examen en tablet), práctica y
           certificado con QR verificable.{' '}
-          {isAdmin && (
+          {canManage && (
             <Link href="/capacitaciones/bancos" style={{ color: '#2563eb' }}>
-              Gestionar bancos de preguntas →
+              Categorías y plantillas de examen →
             </Link>
           )}
         </p>
@@ -112,12 +115,12 @@ export default function CapacitacionesPage() {
           </label>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <label style={fieldStyle}>
-              <span style={labelStyle}>Banco de examen (categoría)</span>
-              <select value={bankId} onChange={(e) => setBankId(e.target.value)} style={inputStyle}>
+              <span style={labelStyle}>Plantilla de examen</span>
+              <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} style={inputStyle}>
                 <option value="">— Sin examen teórico —</option>
-                {banks.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.categoria} · {b.nombre} ({b.preguntas} preg.)
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nombre} · {t.categoria ?? '—'} ({t.preguntas_por_examen} preg. · {t.nota_minima}%)
                   </option>
                 ))}
               </select>
@@ -150,10 +153,13 @@ export default function CapacitacionesPage() {
               <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} style={inputStyle} />
             </label>
           </div>
-          {banks.length === 0 && (
+          {templates.length === 0 && (
             <p style={{ margin: 0, fontSize: 13, color: '#b45309' }}>
-              ⚠️ No hay bancos de preguntas cargados todavía. Podés crear la comisión igual y
-              asignarle el banco cuando esté listo.
+              ⚠️ Todavía no hay plantillas de examen.{' '}
+              {canManage
+                ? <Link href="/capacitaciones/bancos" style={{ color: '#2563eb' }}>Creá una categoría y su plantilla →</Link>
+                : 'Pedile al instructor o admin que cree una.'}{' '}
+              Podés crear la comisión igual y asignarle la plantilla después.
             </p>
           )}
           <div>

@@ -18,6 +18,7 @@ export interface TrainingCourse {
   nombre: string;
   course_id: string | null;
   bank_id: string | null;
+  template_id: string | null;
   sede: string | null;
   instructor_id: string | null;
   fecha_inicio: string | null;
@@ -32,6 +33,7 @@ export interface TrainingCourse {
 export interface TrainingCourseView extends TrainingCourse {
   instructor_email: string | null;
   banco_categoria: string | null;
+  plantilla_nombre: string | null;
   alumnos: number;
 }
 
@@ -81,14 +83,17 @@ export async function listTrainingCourses(
   const res = await query<TrainingCourseView & { alumnos: string }>(
     `SELECT tc.*,
             u.email      AS instructor_email,
-            b.categoria  AS banco_categoria,
+            COALESCE(b.categoria, tb.categoria) AS banco_categoria,
+            t.nombre     AS plantilla_nombre,
             COUNT(cs.id) AS alumnos
        FROM training_courses tc
        LEFT JOIN admin_users u    ON u.id = tc.instructor_id
        LEFT JOIN exam_banks  b    ON b.id = tc.bank_id
+       LEFT JOIN exam_templates t ON t.id = tc.template_id
+       LEFT JOIN exam_banks  tb   ON tb.id = t.bank_id
        LEFT JOIN course_students cs ON cs.training_course_id = tc.id
        ${where}
-      GROUP BY tc.id, u.email, b.categoria
+      GROUP BY tc.id, u.email, b.categoria, tb.categoria, t.nombre
       ORDER BY tc.created_at DESC`,
     values,
   );
@@ -100,10 +105,33 @@ export async function getTrainingCourse(id: string): Promise<TrainingCourse | nu
   return res.rows[0] ?? null;
 }
 
+/** Comisión con datos derivados (instructor, categoría, plantilla) para el detalle. */
+export async function getTrainingCourseView(id: string): Promise<TrainingCourseView | null> {
+  const res = await query<TrainingCourseView & { alumnos: string }>(
+    `SELECT tc.*,
+            u.email      AS instructor_email,
+            COALESCE(b.categoria, tb.categoria) AS banco_categoria,
+            t.nombre     AS plantilla_nombre,
+            COUNT(cs.id) AS alumnos
+       FROM training_courses tc
+       LEFT JOIN admin_users u    ON u.id = tc.instructor_id
+       LEFT JOIN exam_banks  b    ON b.id = tc.bank_id
+       LEFT JOIN exam_templates t ON t.id = tc.template_id
+       LEFT JOIN exam_banks  tb   ON tb.id = t.bank_id
+       LEFT JOIN course_students cs ON cs.training_course_id = tc.id
+      WHERE tc.id = $1
+      GROUP BY tc.id, u.email, b.categoria, tb.categoria, t.nombre`,
+    [id],
+  );
+  const row = res.rows[0];
+  return row ? { ...row, alumnos: Number(row.alumnos) } : null;
+}
+
 export async function createTrainingCourse(input: {
   nombre: string;
   courseId?: string | null;
   bankId?: string | null;
+  templateId?: string | null;
   sede?: string | null;
   instructorId?: string | null;
   fechaInicio?: string | null;
@@ -112,12 +140,12 @@ export async function createTrainingCourse(input: {
 }): Promise<TrainingCourse> {
   const res = await query<TrainingCourse>(
     `INSERT INTO training_courses
-       (nombre, course_id, bank_id, sede, instructor_id, fecha_inicio, fecha_fin, notas)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+       (nombre, course_id, bank_id, template_id, sede, instructor_id, fecha_inicio, fecha_fin, notas)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
     [
-      input.nombre, input.courseId ?? null, input.bankId ?? null, input.sede ?? null,
-      input.instructorId ?? null, input.fechaInicio ?? null, input.fechaFin ?? null,
-      input.notas ?? null,
+      input.nombre, input.courseId ?? null, input.bankId ?? null, input.templateId ?? null,
+      input.sede ?? null, input.instructorId ?? null, input.fechaInicio ?? null,
+      input.fechaFin ?? null, input.notas ?? null,
     ],
   );
   return res.rows[0];
@@ -126,13 +154,13 @@ export async function createTrainingCourse(input: {
 export async function updateTrainingCourse(
   id: string,
   fields: Partial<{
-    nombre: string; bank_id: string | null; sede: string | null;
+    nombre: string; bank_id: string | null; template_id: string | null; sede: string | null;
     instructor_id: string | null; fecha_inicio: string | null; fecha_fin: string | null;
     estado: TrainingEstado; notas: string | null;
   }>,
 ): Promise<TrainingCourse | null> {
   const allowed: (keyof typeof fields)[] = [
-    'nombre', 'bank_id', 'sede', 'instructor_id', 'fecha_inicio', 'fecha_fin', 'estado', 'notas',
+    'nombre', 'bank_id', 'template_id', 'sede', 'instructor_id', 'fecha_inicio', 'fecha_fin', 'estado', 'notas',
   ];
   const sets: string[] = [];
   const values: unknown[] = [];

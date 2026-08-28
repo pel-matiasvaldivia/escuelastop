@@ -50,6 +50,7 @@ export interface ExamSession {
   id: string;
   course_student_id: string;
   bank_id: string;
+  nota_minima: number | null;
   estado: ExamSessionEstado;
   preguntas: { id: string; enunciado: string; opciones: string[]; correcta: number }[] | null;
   respuestas: number[] | null;
@@ -196,28 +197,34 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 /**
- * El instructor habilita el examen de un alumno. Sortea las preguntas del banco
- * de la comisión y deja la sesión lista para que el alumno la inicie en la tablet.
+ * El instructor habilita el examen de un alumno. Sortea las preguntas de la
+ * categoría (bankId) según la cantidad y nota mínima resueltas (de la plantilla
+ * de la comisión, o del propio banco como fallback) y guarda ese snapshot en la
+ * sesión, para que la corrección sea estable aunque la plantilla cambie después.
  */
 export async function habilitarExamen(
-  courseStudentId: string, bankId: string, instructor: string,
+  courseStudentId: string,
+  opts: { bankId: string; preguntasPorExamen?: number; notaMinima?: number },
+  instructor: string,
 ): Promise<ExamSession | { error: string }> {
-  const bank = await getBank(bankId);
-  if (!bank) return { error: 'La comisión no tiene un banco de examen asociado' };
+  const bank = await getBank(opts.bankId);
+  if (!bank) return { error: 'La comisión no tiene una categoría de examen asociada' };
 
-  const all = await listQuestions(bankId);
+  const all = await listQuestions(opts.bankId);
   const activas = all.filter((q) => q.activa);
-  if (activas.length === 0) return { error: 'El banco no tiene preguntas cargadas' };
+  if (activas.length === 0) return { error: 'La categoría no tiene preguntas cargadas' };
 
-  const n = Math.min(bank.preguntas_por_examen, activas.length);
+  const cantidad = opts.preguntasPorExamen ?? bank.preguntas_por_examen;
+  const notaMinima = opts.notaMinima ?? bank.nota_minima;
+  const n = Math.min(cantidad, activas.length);
   const seleccion = shuffle(activas).slice(0, n).map((q) => ({
     id: q.id, enunciado: q.enunciado, opciones: q.opciones, correcta: q.correcta,
   }));
 
   const res = await query<ExamSession>(
-    `INSERT INTO exam_sessions (course_student_id, bank_id, estado, preguntas, habilitado_por)
-     VALUES ($1, $2, 'habilitado', $3::jsonb, $4) RETURNING *`,
-    [courseStudentId, bankId, JSON.stringify(seleccion), instructor],
+    `INSERT INTO exam_sessions (course_student_id, bank_id, nota_minima, estado, preguntas, habilitado_por)
+     VALUES ($1, $2, $3, 'habilitado', $4::jsonb, $5) RETURNING *`,
+    [courseStudentId, opts.bankId, notaMinima, JSON.stringify(seleccion), instructor],
   );
   return res.rows[0];
 }
@@ -271,8 +278,9 @@ export async function entregarExamen(
   if (session.estado === 'validado') return { error: 'El examen ya fue validado' };
   if (!session.preguntas) return { error: 'La sesión no tiene preguntas' };
 
-  const bank = await getBank(session.bank_id);
-  const notaMinima = bank?.nota_minima ?? 70;
+  // Nota mínima congelada al habilitar; si falta (sesión vieja), cae al banco.
+  const notaMinima =
+    session.nota_minima ?? (await getBank(session.bank_id))?.nota_minima ?? 70;
 
   const total = session.preguntas.length;
   let correctas = 0;
@@ -303,4 +311,100 @@ export async function validarExamen(
     [id, instructor],
   );
   return res.rows[0] ?? null;
+}
+
+// ----------------------------- Plantillas ----------------------------------
+
+export interface ExamTemplate {
+  id: string;
+  nombre: string;
+  bank_id: string;
+  preguntas_por_examen: number;
+  nota_minima: number;
+  tiempo_limite_min: number;
+  intentos_max: number;
+  activo: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Plantilla con datos de su categoría para el listado del panel. */
+export interface ExamTemplateView extends ExamTemplate {
+  categoria: string | null;
+  banco_nombre: string | null;
+  preguntas_banco: number;
+}
+
+export async function listTemplates(): Promise<ExamTemplateView[]> {
+  const res = await query<ExamTemplateView & { preguntas_banco: string }>(
+    `SELECT t.*, b.categoria, b.nombre AS banco_nombre,
+            COUNT(q.id) FILTER (WHERE q.activa) AS preguntas_banco
+       FROM exam_templates t
+       LEFT JOIN exam_banks b ON b.id = t.bank_id
+       LEFT JOIN exam_questions q ON q.bank_id = t.bank_id
+      GROUP BY t.id, b.categoria, b.nombre
+      ORDER BY t.created_at DESC`,
+  );
+  return res.rows.map((r) => ({ ...r, preguntas_banco: Number(r.preguntas_banco) }));
+}
+
+export async function getTemplate(id: string): Promise<ExamTemplate | null> {
+  const res = await query<ExamTemplate>('SELECT * FROM exam_templates WHERE id = $1', [id]);
+  return res.rows[0] ?? null;
+}
+
+export async function createTemplate(input: {
+  nombre: string;
+  bankId: string;
+  preguntasPorExamen?: number;
+  notaMinima?: number;
+  tiempoLimiteMin?: number;
+  intentosMax?: number;
+  createdBy?: string | null;
+}): Promise<ExamTemplate> {
+  const res = await query<ExamTemplate>(
+    `INSERT INTO exam_templates
+       (nombre, bank_id, preguntas_por_examen, nota_minima, tiempo_limite_min, intentos_max, created_by)
+     VALUES ($1, $2, COALESCE($3, 10), COALESCE($4, 70), COALESCE($5, 30), COALESCE($6, 2), $7)
+     RETURNING *`,
+    [
+      input.nombre, input.bankId, input.preguntasPorExamen ?? null, input.notaMinima ?? null,
+      input.tiempoLimiteMin ?? null, input.intentosMax ?? null, input.createdBy ?? null,
+    ],
+  );
+  return res.rows[0];
+}
+
+export async function updateTemplate(
+  id: string,
+  fields: Partial<{
+    nombre: string; bank_id: string; preguntas_por_examen: number; nota_minima: number;
+    tiempo_limite_min: number; intentos_max: number; activo: boolean;
+  }>,
+): Promise<ExamTemplate | null> {
+  const allowed: (keyof typeof fields)[] = [
+    'nombre', 'bank_id', 'preguntas_por_examen', 'nota_minima', 'tiempo_limite_min', 'intentos_max', 'activo',
+  ];
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  for (const key of allowed) {
+    if (fields[key] !== undefined) {
+      values.push(fields[key]);
+      sets.push(`${key} = $${values.length}`);
+    }
+  }
+  if (sets.length === 0) return getTemplate(id);
+  values.push(id);
+  const res = await query<ExamTemplate>(
+    `UPDATE exam_templates SET ${sets.join(', ')}, updated_at = now()
+      WHERE id = $${values.length} RETURNING *`,
+    values,
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function deleteTemplate(id: string): Promise<boolean> {
+  const res = await query('DELETE FROM exam_templates WHERE id = $1', [id]);
+  return (res.rowCount ?? 0) > 0;
 }

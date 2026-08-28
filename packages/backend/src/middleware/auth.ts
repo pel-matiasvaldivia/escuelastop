@@ -44,3 +44,16 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   }
   next();
 }
+
+/**
+ * Restringe una ruta a instructores o admins (gestión de categorías de preguntas
+ * y plantillas de examen de la Fase 2). Debe usarse después de requireAuth.
+ */
+export function requireInstructorOrAdmin(req: Request, res: Response, next: NextFunction): void {
+  const role = req.admin?.role;
+  if (role !== 'admin' && role !== 'instructor') {
+    res.status(403).json({ error: 'Requiere permisos de instructor o administrador' });
+    return;
+  }
+  next();
+}

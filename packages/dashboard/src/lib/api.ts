@@ -124,6 +124,20 @@ export interface ExamQuestion {
   orden: number;
 }
 
+export interface ExamTemplate {
+  id: string;
+  nombre: string;
+  bank_id: string;
+  preguntas_por_examen: number;
+  nota_minima: number;
+  tiempo_limite_min: number;
+  intentos_max: number;
+  activo: boolean;
+  categoria?: string | null;
+  banco_nombre?: string | null;
+  preguntas_banco?: number;
+}
+
 export type TrainingEstado = 'abierto' | 'en_curso' | 'cerrado' | 'cancelado';
 
 export interface TrainingCourse {
@@ -131,10 +145,12 @@ export interface TrainingCourse {
   nombre: string;
   course_id: string | null;
   bank_id: string | null;
+  template_id: string | null;
   sede: string | null;
   instructor_id: string | null;
   instructor_email?: string | null;
   banco_categoria?: string | null;
+  plantilla_nombre?: string | null;
   fecha_inicio: string | null;
   fecha_fin: string | null;
   estado: TrainingEstado;
@@ -569,16 +585,28 @@ export const api = {
     send<{ importadas: number }>(`/exam-banks/${bankId}/questions/bulk`, 'POST', { preguntas }),
   deleteQuestion: (id: string) => send<{ ok: boolean }>(`/exam-questions/${id}`, 'DELETE'),
 
+  // -- Plantillas de examen --
+  examTemplates: () => get<ExamTemplate[]>('/exam-templates'),
+  createTemplate: (data: {
+    nombre: string; bankId: string; preguntasPorExamen?: number; notaMinima?: number;
+    tiempoLimiteMin?: number; intentosMax?: number;
+  }) => send<ExamTemplate>('/exam-templates', 'POST', data),
+  updateTemplate: (id: string, data: Partial<{
+    nombre: string; bankId: string; preguntasPorExamen: number; notaMinima: number;
+    tiempoLimiteMin: number; intentosMax: number; activo: boolean;
+  }>) => send<ExamTemplate>(`/exam-templates/${id}`, 'PATCH', data),
+  deleteTemplate: (id: string) => send<{ ok: boolean }>(`/exam-templates/${id}`, 'DELETE'),
+
   // -- Comisiones --
   trainingCourses: () => get<TrainingCourse[]>('/training-courses'),
   trainingCourse: (id: string) =>
     get<{ course: TrainingCourse; alumnos: CourseStudent[] }>(`/training-courses/${id}`),
   createTrainingCourse: (data: {
-    nombre: string; courseId?: string; bankId?: string; sede?: string;
+    nombre: string; courseId?: string; bankId?: string; templateId?: string; sede?: string;
     instructorId?: string; fechaInicio?: string; fechaFin?: string; notas?: string;
   }) => send<TrainingCourse>('/training-courses', 'POST', data),
   updateTrainingCourse: (id: string, data: Partial<{
-    nombre: string; bank_id: string | null; sede: string | null;
+    nombre: string; bank_id: string | null; template_id: string | null; sede: string | null;
     instructor_id: string | null; estado: TrainingEstado; notas: string | null;
   }>) => send<TrainingCourse>(`/training-courses/${id}`, 'PATCH', data),
 

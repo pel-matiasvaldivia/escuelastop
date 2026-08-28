@@ -109,7 +109,8 @@ export default function ComisionDetalle() {
           <h2 style={{ margin: '0 0 6px' }}>{course.nombre}</h2>
           <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>
             {course.sede ?? 'Sin sucursal'} · Instructor: {course.instructor_email ?? '—'} ·
-            Banco: {course.banco_categoria ?? 'sin examen'} · Estado: {course.estado.replace('_', ' ')}
+            Examen: {course.plantilla_nombre ?? course.banco_categoria ?? 'sin examen'} ·
+            Estado: {course.estado.replace('_', ' ')}
           </p>
         </div>
         {course.estado !== 'cerrado' && (
