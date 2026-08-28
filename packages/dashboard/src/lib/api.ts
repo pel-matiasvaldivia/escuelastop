@@ -95,6 +95,109 @@ export interface Course {
   contactSucursal?: boolean;
 }
 
+// ------------------------------ Fase 2 -------------------------------------
+
+export interface ExamCategory {
+  key: string;
+  nombre: string;
+}
+
+export interface ExamBank {
+  id: string;
+  categoria: string;
+  nombre: string;
+  descripcion: string | null;
+  preguntas_por_examen: number;
+  nota_minima: number;
+  tiempo_limite_min: number;
+  intentos_max: number;
+  activo: boolean;
+  preguntas: number;
+}
+
+export interface ExamQuestion {
+  id: string;
+  bank_id: string;
+  enunciado: string;
+  opciones: string[];
+  correcta: number;
+  orden: number;
+}
+
+export type TrainingEstado = 'abierto' | 'en_curso' | 'cerrado' | 'cancelado';
+
+export interface TrainingCourse {
+  id: string;
+  nombre: string;
+  course_id: string | null;
+  bank_id: string | null;
+  sede: string | null;
+  instructor_id: string | null;
+  instructor_email?: string | null;
+  banco_categoria?: string | null;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  estado: TrainingEstado;
+  notas: string | null;
+  alumnos?: number;
+}
+
+export type StudentEstado =
+  | 'cursando' | 'teoria_aprobada' | 'teoria_desaprobada' | 'aprobado' | 'desaprobado';
+
+export interface CourseStudent {
+  id: string;
+  training_course_id: string;
+  full_name: string;
+  dni: string;
+  codigo: string;
+  estado: StudentEstado;
+  practica_aprobada: boolean | null;
+  practica_rubrica: { item: string; ok: boolean }[] | null;
+  practica_at: string | null;
+}
+
+export interface ExamSession {
+  id: string;
+  course_student_id: string;
+  estado: 'habilitado' | 'en_curso' | 'entregado' | 'validado' | 'anulado';
+  puntaje: number | null;
+  aprobado: boolean | null;
+  habilitado_at: string;
+  entregado_at: string | null;
+  validado_at: string | null;
+}
+
+export interface Certificate {
+  id: string;
+  serial: string;
+  codigo_verif: string;
+  emitido_por: string;
+  emitido_at: string;
+  anulado: boolean;
+  datos: Record<string, unknown>;
+  verifyUrl: string;
+}
+
+/** Pregunta como la ve el alumno en el kiosco (sin la respuesta correcta). */
+export interface PresentedQuestion {
+  id: string;
+  enunciado: string;
+  opciones: string[];
+}
+
+export interface ExamStart {
+  sessionId: string;
+  alumno: string;
+  curso: string | null;
+  tiempoLimiteMin: number | null;
+  preguntas: PresentedQuestion[];
+}
+
+export type CertVerification =
+  | { valido: true; anulado: boolean; serial: string; datos: Record<string, unknown>; emitido_at: string }
+  | { valido: false };
+
 // ------------------------------ Sesión -------------------------------------
 const TOKEN_KEY = 'stop_token';
 const USER_KEY = 'stop_user';
@@ -186,6 +289,39 @@ async function get<T>(path: string): Promise<T> {
   });
   handle401(res);
   if (!res.ok) throw new Error(`Error ${res.status} en ${path}`);
+  return res.json();
+}
+
+/** Mutación autenticada con cuerpo JSON (POST/PATCH/DELETE). */
+async function send<T>(
+  path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown,
+): Promise<T> {
+  const res = await fetch(`${API_URL}/api${path}`, {
+    method,
+    headers: authHeaders(body !== undefined ? { 'Content-Type': 'application/json' } : undefined),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  handle401(res);
+  if (!res.ok) {
+    let msg = `Error ${res.status}`;
+    try { msg = (await res.json()).error ?? msg; } catch { /* sin cuerpo */ }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+/** Igual que `send` pero sin autenticación (kiosco / verificación pública). */
+async function sendPublic<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}/api${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let msg = `Error ${res.status}`;
+    try { msg = (await res.json()).error ?? msg; } catch { /* sin cuerpo */ }
+    throw new Error(msg);
+  }
   return res.json();
 }
 
@@ -415,4 +551,61 @@ export const api = {
     });
     handle401(res);
   },
+
+  // ============================ FASE 2 ============================
+
+  // -- Metadatos y bancos --
+  examCategories: () => get<ExamCategory[]>('/exam-categories'),
+  instructores: () => get<AdminUser[]>('/instructores'),
+  examBanks: () => get<ExamBank[]>('/exam-banks'),
+  bankQuestions: (bankId: string) => get<ExamQuestion[]>(`/exam-banks/${bankId}/questions`),
+  createBank: (data: {
+    categoria: string; nombre: string; descripcion?: string;
+    preguntasPorExamen?: number; notaMinima?: number; tiempoLimiteMin?: number; intentosMax?: number;
+  }) => send<ExamBank>('/exam-banks', 'POST', data),
+  addQuestion: (bankId: string, data: { enunciado: string; opciones: string[]; correcta: number }) =>
+    send<ExamQuestion>(`/exam-banks/${bankId}/questions`, 'POST', data),
+  deleteQuestion: (id: string) => send<{ ok: boolean }>(`/exam-questions/${id}`, 'DELETE'),
+
+  // -- Comisiones --
+  trainingCourses: () => get<TrainingCourse[]>('/training-courses'),
+  trainingCourse: (id: string) =>
+    get<{ course: TrainingCourse; alumnos: CourseStudent[] }>(`/training-courses/${id}`),
+  createTrainingCourse: (data: {
+    nombre: string; courseId?: string; bankId?: string; sede?: string;
+    instructorId?: string; fechaInicio?: string; fechaFin?: string; notas?: string;
+  }) => send<TrainingCourse>('/training-courses', 'POST', data),
+  updateTrainingCourse: (id: string, data: Partial<{
+    nombre: string; bank_id: string | null; sede: string | null;
+    instructor_id: string | null; estado: TrainingEstado; notas: string | null;
+  }>) => send<TrainingCourse>(`/training-courses/${id}`, 'PATCH', data),
+
+  // -- Alumnos de la comisión --
+  addStudent: (courseId: string, data: { fullName: string; dni: string }) =>
+    send<CourseStudent>(`/training-courses/${courseId}/students`, 'POST', data),
+  removeStudent: (id: string) => send<{ ok: boolean }>(`/students/${id}`, 'DELETE'),
+  studentSessions: (id: string) => get<ExamSession[]>(`/students/${id}/sessions`),
+
+  // -- Examen teórico --
+  enableExam: (studentId: string) => send<ExamSession>(`/students/${studentId}/exam/enable`, 'POST'),
+  validateExam: (sessionId: string) => send<ExamSession>(`/exam-sessions/${sessionId}/validate`, 'POST'),
+
+  // -- Evaluación práctica --
+  setPractica: (studentId: string, rubrica: { item: string; ok: boolean }[], aprobada: boolean) =>
+    send<CourseStudent>(`/students/${studentId}/practica`, 'POST', { rubrica, aprobada }),
+
+  // -- Certificado --
+  issueCertificate: (studentId: string) => send<Certificate>(`/students/${studentId}/certificate`, 'POST'),
+  getCertificate: (studentId: string) => get<Certificate>(`/students/${studentId}/certificate`),
+
+  // -- Kiosco público del examen (tablet del alumno) --
+  examStart: (dni: string, codigo: string) =>
+    sendPublic<ExamStart>('/public/exam/start', { dni, codigo }),
+  examSubmit: (sessionId: string, dni: string, codigo: string, respuestas: number[]) =>
+    sendPublic<{ entregado: boolean; puntaje: number; aprobado: boolean }>(
+      `/public/exam/${sessionId}/submit`, { dni, codigo, respuestas },
+    ),
+
+  // -- Verificación pública del certificado (QR) --
+  verifyCertificate: (codigo: string) => get<CertVerification>(`/public/verificar/${codigo}`),
 };

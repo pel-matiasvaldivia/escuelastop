@@ -40,6 +40,11 @@ export default function Header() {
         {loggedIn && pathname !== '/login' && (
           <nav style={{ display: 'flex', gap: 4 }}>
             <Tab href="/" label="Inscripciones" active={pathname === '/'} />
+            <Tab
+              href="/capacitaciones"
+              label="Capacitaciones"
+              active={pathname.startsWith('/capacitaciones')}
+            />
             <Tab href="/whatsapp" label="WhatsApp" active={pathname === '/whatsapp'} />
             {isAdmin && (
               <Tab href="/usuarios" label="Usuarios" active={pathname === '/usuarios'} />

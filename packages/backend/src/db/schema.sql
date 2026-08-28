@@ -114,3 +114,121 @@ ALTER TABLE admin_users
   ADD COLUMN IF NOT EXISTS sucursal TEXT;
 -- Filtro por sede (scoping por sucursal en el panel).
 CREATE INDEX IF NOT EXISTS idx_enrollments_sede ON enrollments(sede);
+
+-- ===========================================================================
+-- FASE 2 — Capacitación, evaluación teórica/práctica y certificación.
+--
+-- Flujo: se arma una COMISIÓN (training_courses) de un curso en una sucursal a
+-- cargo de un instructor; se matriculan ALUMNOS (course_students), cada uno con
+-- un código único. El instructor HABILITA el examen teórico (exam_sessions), el
+-- alumno lo rinde en una tablet con DNI + código, la plataforma corrige solo, el
+-- instructor VALIDA. Se registra además la evaluación PRÁCTICA (rúbrica). Al
+-- aprobar ambas, se emite un CERTIFICADO con firma electrónica + QR verificable.
+-- ===========================================================================
+
+-- Banco de examen por tipo de licencia (B1, D1, E1, ...). Cada categoría tiene
+-- su propio banco: el examen es distinto según el tipo de curso.
+CREATE TABLE IF NOT EXISTS exam_banks (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  categoria            TEXT UNIQUE NOT NULL,          -- clave del tipo (ej: B1, D1, E1)
+  nombre               TEXT NOT NULL,
+  descripcion          TEXT,
+  preguntas_por_examen INT  NOT NULL DEFAULT 10,      -- cuántas se sortean por intento
+  nota_minima          INT  NOT NULL DEFAULT 70,      -- % para aprobar
+  tiempo_limite_min    INT  NOT NULL DEFAULT 30,
+  intentos_max         INT  NOT NULL DEFAULT 2,
+  activo               BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Preguntas de cada banco (opción múltiple).
+CREATE TABLE IF NOT EXISTS exam_questions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bank_id     UUID NOT NULL REFERENCES exam_banks(id) ON DELETE CASCADE,
+  enunciado   TEXT NOT NULL,
+  opciones    JSONB NOT NULL,                 -- array de strings
+  correcta    INT  NOT NULL,                  -- índice (0-based) de la opción correcta
+  activa      BOOLEAN NOT NULL DEFAULT TRUE,
+  orden       INT NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_exam_questions_bank ON exam_questions(bank_id);
+
+-- Comisiones / cohortes: una instancia concreta de un curso, en una sucursal, a
+-- cargo de un instructor, con el banco de examen que le corresponde.
+CREATE TABLE IF NOT EXISTS training_courses (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre        TEXT NOT NULL,                -- ej: "B1 — Comisión Agosto Casa Central"
+  course_id     TEXT,                         -- id del catálogo (catalog.ts), informativo
+  bank_id       UUID REFERENCES exam_banks(id),
+  sede          TEXT,
+  instructor_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  fecha_inicio  DATE,
+  fecha_fin     DATE,
+  estado        TEXT NOT NULL DEFAULT 'abierto'
+                CHECK (estado IN ('abierto','en_curso','cerrado','cancelado')),
+  notas         TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_training_courses_sede ON training_courses(sede);
+
+-- Alumnos matriculados en una comisión. Puede venir de una inscripción de la
+-- Fase 1 (enrollment) o cargarse a mano. Cada alumno tiene un código único con
+-- el que inicia el examen en la tablet.
+CREATE TABLE IF NOT EXISTS course_students (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  training_course_id UUID NOT NULL REFERENCES training_courses(id) ON DELETE CASCADE,
+  enrollment_id      UUID REFERENCES enrollments(id) ON DELETE SET NULL,
+  contact_id         UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  full_name          TEXT NOT NULL,
+  dni                TEXT NOT NULL,
+  codigo             TEXT NOT NULL,           -- código único para iniciar el examen
+  estado             TEXT NOT NULL DEFAULT 'cursando'
+                     CHECK (estado IN ('cursando','teoria_aprobada','teoria_desaprobada',
+                                       'aprobado','desaprobado')),
+  practica_aprobada  BOOLEAN,                 -- NULL = sin evaluar aún
+  practica_rubrica   JSONB,                   -- items evaluados (habilidades/maniobras)
+  practica_por       TEXT,
+  practica_at        TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (training_course_id, dni)
+);
+CREATE INDEX IF NOT EXISTS idx_course_students_course ON course_students(training_course_id);
+
+-- Intentos de examen teórico. El instructor lo habilita; el alumno lo rinde en
+-- la tablet; la plataforma recoge el resultado; el instructor lo valida.
+CREATE TABLE IF NOT EXISTS exam_sessions (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_student_id UUID NOT NULL REFERENCES course_students(id) ON DELETE CASCADE,
+  bank_id           UUID NOT NULL REFERENCES exam_banks(id),
+  estado            TEXT NOT NULL DEFAULT 'habilitado'
+                    CHECK (estado IN ('habilitado','en_curso','entregado','validado','anulado')),
+  preguntas         JSONB,                    -- snapshot de las preguntas presentadas
+  respuestas        JSONB,                    -- respuestas del alumno (índices)
+  puntaje           INT,                      -- % obtenido
+  aprobado          BOOLEAN,
+  habilitado_por    TEXT,                     -- instructor que dio inicio
+  validado_por      TEXT,                     -- instructor que validó/cerró
+  habilitado_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  iniciado_at       TIMESTAMPTZ,
+  entregado_at      TIMESTAMPTZ,
+  validado_at       TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_exam_sessions_student ON exam_sessions(course_student_id);
+
+-- Certificados con firma electrónica (HMAC del contenido) + QR verificable.
+CREATE TABLE IF NOT EXISTS certificates (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_student_id UUID NOT NULL REFERENCES course_students(id) ON DELETE CASCADE,
+  serial            TEXT UNIQUE NOT NULL,     -- número legible (ej: STOP-2026-000123)
+  codigo_verif      TEXT UNIQUE NOT NULL,     -- token del QR (URL pública de verificación)
+  firma             TEXT NOT NULL,            -- HMAC del contenido (firma electrónica)
+  datos             JSONB NOT NULL,           -- snapshot: alumno, dni, curso, categoría, nota, fechas, instructor
+  emitido_por       TEXT NOT NULL,
+  emitido_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  anulado           BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_certificates_student ON certificates(course_student_id);

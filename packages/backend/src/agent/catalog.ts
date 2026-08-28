@@ -60,6 +60,23 @@ export function isSucursalActiva(nombre: string): boolean {
   return SUCURSALES_ACTIVAS.some((s) => s.nombre === nombre);
 }
 
+/**
+ * Categorías de examen teórico (Fase 2). Cada tipo de licencia tiene su propio
+ * banco de preguntas: el examen del B1 no es el mismo que el de un D2 o un E1.
+ * La clave `key` coincide con `exam_banks.categoria` en la base.
+ */
+export const EXAM_CATEGORIES = [
+  { key: 'B1', nombre: 'B1 — Particular (autos)' },
+  { key: 'D1', nombre: 'Profesional D1 — Uber / Taxi / Remis' },
+  { key: 'D', nombre: 'Profesional D3 / D2 / D1 — Micro y traffic' },
+  { key: 'E1', nombre: 'Profesional E1 — C1/C2/C3 carga pesada' },
+  { key: 'C', nombre: 'Profesional C1 / C2' },
+  { key: 'E2', nombre: 'Profesional E2 — Maquinaria especial' },
+  { key: 'RENOVACION', nombre: 'Renovación / Revalidación profesional' },
+] as const;
+
+export type ExamCategoryKey = (typeof EXAM_CATEGORIES)[number]['key'];
+
 /** Campos que el formulario puede pedir. El curso declara cuáles necesita. */
 export type FormFieldKey =
   | 'nombre'
