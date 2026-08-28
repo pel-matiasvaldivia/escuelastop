@@ -302,12 +302,20 @@ function StudentPanel({
           <h4 style={blockTitle}>3 · Certificado</h4>
           {cert ? (
             <div style={{ fontSize: 13 }}>
-              <p style={{ margin: '0 0 6px' }}>
+              <p style={{ margin: '0 0 8px' }}>
                 <strong>{cert.serial}</strong>{cert.anulado && <span style={{ color: '#dc2626' }}> (anulado)</span>}
               </p>
-              <a href={cert.verifyUrl} target="_blank" rel="noreferrer" style={{ color: '#2563eb' }}>
-                Ver verificación (QR) →
+              <a
+                href={api.certificatePdfUrl(student.id)} target="_blank" rel="noreferrer"
+                style={{ ...primaryBtn, background: '#d42f2f', display: 'inline-block', textDecoration: 'none' }}
+              >
+                Descargar PDF
               </a>
+              <div style={{ marginTop: 8 }}>
+                <a href={cert.verifyUrl} target="_blank" rel="noreferrer" style={{ color: '#2563eb' }}>
+                  Ver verificación (QR) →
+                </a>
+              </div>
             </div>
           ) : (
             <>

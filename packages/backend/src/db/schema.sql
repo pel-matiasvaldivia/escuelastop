@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email         TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
-  role          TEXT NOT NULL DEFAULT 'operador' CHECK (role IN ('admin','operador')),
+  role          TEXT NOT NULL DEFAULT 'operador' CHECK (role IN ('admin','operador','instructor')),
   -- Sucursal a la que pertenece un operador (nombre exacto de la sucursal, igual
   -- que enrollments.sede). NULL para el admin, que ve todas las sucursales.
   sucursal      TEXT,
@@ -114,6 +114,12 @@ ALTER TABLE admin_users
   ADD COLUMN IF NOT EXISTS sucursal TEXT;
 -- Filtro por sede (scoping por sucursal en el panel).
 CREATE INDEX IF NOT EXISTS idx_enrollments_sede ON enrollments(sede);
+
+-- Rol 'instructor' (Fase 2): da capacitación y controla los exámenes. Se scopea
+-- por sucursal igual que un operador. Ampliamos el CHECK en bases ya creadas.
+ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_role_check;
+ALTER TABLE admin_users
+  ADD CONSTRAINT admin_users_role_check CHECK (role IN ('admin','operador','instructor'));
 
 -- ===========================================================================
 -- FASE 2 — Capacitación, evaluación teórica/práctica y certificación.

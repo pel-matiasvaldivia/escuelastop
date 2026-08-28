@@ -11,7 +11,7 @@ import { config } from '../config.js';
  * migrar a una librería dedicada sin tocar el resto de la app.
  */
 
-export type AdminRole = 'admin' | 'operador';
+export type AdminRole = 'admin' | 'operador' | 'instructor';
 
 export interface AdminUser {
   id: string;
@@ -139,6 +139,14 @@ export class EmailInUseError extends Error {
 export async function listAdmins(): Promise<AdminUserPublic[]> {
   const res = await query<AdminUserPublic>(
     `SELECT ${PUBLIC_COLS} FROM admin_users ORDER BY role, email`,
+  );
+  return res.rows;
+}
+
+/** Usuarios que pueden dictar/evaluar comisiones (instructores y admins). */
+export async function listInstructores(): Promise<AdminUserPublic[]> {
+  const res = await query<AdminUserPublic>(
+    `SELECT ${PUBLIC_COLS} FROM admin_users WHERE role IN ('instructor','admin') ORDER BY email`,
   );
   return res.rows;
 }

@@ -202,7 +202,7 @@ export type CertVerification =
 const TOKEN_KEY = 'stop_token';
 const USER_KEY = 'stop_user';
 
-export type AdminRole = 'admin' | 'operador';
+export type AdminRole = 'admin' | 'operador' | 'instructor';
 
 export interface AdminUser {
   id: string;
@@ -565,6 +565,8 @@ export const api = {
   }) => send<ExamBank>('/exam-banks', 'POST', data),
   addQuestion: (bankId: string, data: { enunciado: string; opciones: string[]; correcta: number }) =>
     send<ExamQuestion>(`/exam-banks/${bankId}/questions`, 'POST', data),
+  importQuestions: (bankId: string, preguntas: { enunciado: string; opciones: string[]; correcta: number }[]) =>
+    send<{ importadas: number }>(`/exam-banks/${bankId}/questions/bulk`, 'POST', { preguntas }),
   deleteQuestion: (id: string) => send<{ ok: boolean }>(`/exam-questions/${id}`, 'DELETE'),
 
   // -- Comisiones --
@@ -597,6 +599,10 @@ export const api = {
   // -- Certificado --
   issueCertificate: (studentId: string) => send<Certificate>(`/students/${studentId}/certificate`, 'POST'),
   getCertificate: (studentId: string) => get<Certificate>(`/students/${studentId}/certificate`),
+  /** URL del PDF del certificado (token en la query para poder abrirlo con <a>). */
+  certificatePdfUrl(studentId: string): string {
+    return `${API_URL}/api/students/${studentId}/certificate/pdf?token=${auth.getToken() ?? ''}`;
+  },
 
   // -- Kiosco público del examen (tablet del alumno) --
   examStart: (dni: string, codigo: string) =>

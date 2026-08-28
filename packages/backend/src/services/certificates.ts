@@ -1,4 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import PDFDocument from 'pdfkit';
+import QRCode from 'qrcode';
 import { query } from '../db/index.js';
 import { config } from '../config.js';
 
@@ -123,4 +125,93 @@ export async function verificar(codigoVerif: string): Promise<
 export async function anular(id: string): Promise<boolean> {
   const res = await query('UPDATE certificates SET anulado = TRUE WHERE id = $1', [id]);
   return (res.rowCount ?? 0) > 0;
+}
+
+export async function getById(id: string): Promise<Certificate | null> {
+  const res = await query<Certificate>('SELECT * FROM certificates WHERE id = $1', [id]);
+  return res.rows[0] ?? null;
+}
+
+// ------------------------------ PDF ----------------------------------------
+
+const NAVY = '#131a27';
+const RED = '#d42f2f';
+const GRAY = '#5b6472';
+
+/**
+ * Genera el PDF del certificado (A4 apaisado) con el QR de verificación
+ * embebido. Server-side con pdfkit: no necesita navegador ni fuentes externas.
+ */
+export async function renderPdf(cert: Certificate): Promise<Buffer> {
+  const d = cert.datos;
+  const url = verifyUrl(cert.codigo_verif);
+  const qrPng = await QRCode.toBuffer(url, { margin: 1, width: 320 });
+
+  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0 });
+  const chunks: Buffer[] = [];
+  doc.on('data', (c: Buffer) => chunks.push(c));
+  const done = new Promise<Buffer>((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
+
+  const W = doc.page.width;   // ~841.89
+  const H = doc.page.height;  // ~595.28
+
+  // Marco decorativo.
+  doc.rect(0, 0, W, H).fill('#ffffff');
+  doc.lineWidth(3).strokeColor(NAVY).rect(24, 24, W - 48, H - 48).stroke();
+  doc.lineWidth(1).strokeColor(RED).rect(34, 34, W - 68, H - 68).stroke();
+
+  // Encabezado.
+  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(15)
+    .text('ESCUELA DE MANEJO STOP', 0, 66, { align: 'center' });
+  doc.fillColor(GRAY).font('Helvetica').fontSize(10)
+    .text('Mendoza, Argentina', { align: 'center' });
+
+  doc.fillColor(RED).font('Helvetica-Bold').fontSize(30)
+    .text('CERTIFICADO DE APROBACIÓN', 0, 120, { align: 'center' });
+
+  // Cuerpo.
+  doc.fillColor(GRAY).font('Helvetica').fontSize(13)
+    .text('Se certifica que', 0, 190, { align: 'center' });
+  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(26)
+    .text(d.alumno, 0, 212, { align: 'center' });
+  doc.fillColor(GRAY).font('Helvetica').fontSize(12)
+    .text(`DNI ${d.dni}`, 0, 246, { align: 'center' });
+
+  const cat = d.categoria ? ` (categoría ${d.categoria})` : '';
+  const nota = d.nota !== null && d.nota !== undefined ? ` con una calificación de ${d.nota}%` : '';
+  doc.fillColor(NAVY).font('Helvetica').fontSize(14)
+    .text(`aprobó satisfactoriamente el curso`, 0, 278, { align: 'center' });
+  doc.font('Helvetica-Bold').fontSize(16)
+    .text(`${d.curso}${cat}`, 60, 300, { align: 'center', width: W - 120 });
+  if (nota) {
+    doc.font('Helvetica').fontSize(12).fillColor(GRAY)
+      .text(nota.trim(), 0, 328, { align: 'center' });
+  }
+
+  // Pie: datos y firma.
+  const baseY = H - 150;
+  doc.fillColor(GRAY).font('Helvetica').fontSize(10);
+  const fecha = d.fecha_emision ? new Date(d.fecha_emision).toLocaleDateString('es-AR') : '';
+  doc.text(`Sucursal: ${d.sede ?? '—'}`, 70, baseY);
+  doc.text(`Instructor: ${d.instructor ?? '—'}`, 70, baseY + 16);
+  doc.text(`Fecha de emisión: ${fecha}`, 70, baseY + 32);
+  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(11)
+    .text(`Certificado N.º ${cert.serial}`, 70, baseY + 52);
+
+  // QR de verificación (abajo a la derecha).
+  const qrSize = 96;
+  const qrX = W - 70 - qrSize;
+  const qrY = baseY - 8;
+  doc.image(qrPng, qrX, qrY, { width: qrSize, height: qrSize });
+  doc.fillColor(GRAY).font('Helvetica').fontSize(8)
+    .text('Verificá la autenticidad', qrX - 20, qrY + qrSize + 4, { width: qrSize + 40, align: 'center' });
+
+  if (cert.anulado) {
+    doc.fillColor(RED).font('Helvetica-Bold').fontSize(60).opacity(0.25)
+      .text('ANULADO', 0, H / 2 - 30, { align: 'center' });
+    doc.opacity(1);
+  }
+
+  doc.end();
+  return done;
 }

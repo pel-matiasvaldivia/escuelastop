@@ -70,7 +70,7 @@ export default function UsuariosPage() {
         email: email.trim(),
         password,
         role,
-        sucursal: role === 'operador' ? sucursal : null,
+        sucursal: role !== 'admin' ? sucursal : null,
       });
       setEmail('');
       setPassword('');
@@ -88,7 +88,7 @@ export default function UsuariosPage() {
     try {
       await api.updateUser(u.id, {
         role: newRole,
-        sucursal: newRole === 'operador' ? (u.sucursal ?? sucursales[0]?.nombre ?? '') : null,
+        sucursal: newRole !== 'admin' ? (u.sucursal ?? sucursales[0]?.nombre ?? '') : null,
       });
       await reload();
       flash('Rol actualizado.');
@@ -171,6 +171,7 @@ export default function UsuariosPage() {
               <span style={labelStyle}>Rol</span>
               <select value={role} onChange={(e) => setRole(e.target.value as AdminRole)} style={inputStyle}>
                 <option value="operador">Operador (una sucursal)</option>
+                <option value="instructor">Instructor (una sucursal)</option>
                 <option value="admin">Administrador (todas)</option>
               </select>
             </label>
@@ -218,6 +219,7 @@ export default function UsuariosPage() {
                     style={miniSelect}
                   >
                     <option value="operador">Operador</option>
+                    <option value="instructor">Instructor</option>
                     <option value="admin">Admin</option>
                   </select>
                 </td>

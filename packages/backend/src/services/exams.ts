@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { query } from '../db/index.js';
+import { pool, query } from '../db/index.js';
 
 /**
  * Exámenes teóricos de la Fase 2.
@@ -146,6 +146,41 @@ export async function addQuestion(input: {
 export async function deleteQuestion(id: string): Promise<boolean> {
   const res = await query('DELETE FROM exam_questions WHERE id = $1', [id]);
   return (res.rowCount ?? 0) > 0;
+}
+
+/**
+ * Alta masiva de preguntas (importación desde Excel/CSV). Inserta todas dentro de
+ * una transacción: si alguna fila falla, no queda nada a medias. El orden respeta
+ * el de la lista, continuando la numeración existente del banco.
+ */
+export async function addQuestionsBulk(
+  bankId: string,
+  items: { enunciado: string; opciones: string[]; correcta: number }[],
+): Promise<number> {
+  if (items.length === 0) return 0;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query<{ n: number }>(
+      'SELECT COALESCE(MAX(orden), -1) + 1 AS n FROM exam_questions WHERE bank_id = $1',
+      [bankId],
+    );
+    let orden = Number(rows[0]?.n ?? 0);
+    for (const q of items) {
+      await client.query(
+        `INSERT INTO exam_questions (bank_id, enunciado, opciones, correcta, orden)
+         VALUES ($1, $2, $3::jsonb, $4, $5)`,
+        [bankId, q.enunciado, JSON.stringify(q.opciones), q.correcta, orden++],
+      );
+    }
+    await client.query('COMMIT');
+    return items.length;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // ------------------------------ Sesiones -----------------------------------

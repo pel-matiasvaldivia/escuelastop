@@ -59,9 +59,12 @@ export default function Header() {
               {user.email}
               <span style={{
                 marginLeft: 8, padding: '2px 8px', borderRadius: 10, fontSize: 11,
-                background: isAdmin ? '#7c3aed' : '#0891b2', color: '#fff',
+                background: isAdmin ? '#7c3aed' : user.role === 'instructor' ? '#c2410c' : '#0891b2',
+                color: '#fff',
               }}>
-                {isAdmin ? 'Admin' : `Sucursal ${user.sucursal ?? '—'}`}
+                {isAdmin
+                  ? 'Admin'
+                  : `${user.role === 'instructor' ? 'Instructor' : 'Operador'} · ${user.sucursal ?? '—'}`}
               </span>
             </span>
           )}

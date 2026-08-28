@@ -4,20 +4,20 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import {
   EXAM_CATEGORIES, getCourse, isSucursalActiva,
 } from '../agent/catalog.js';
-import { listAdmins } from '../services/auth.js';
+import { listInstructores } from '../services/auth.js';
 import {
   listTrainingCourses, getTrainingCourse, createTrainingCourse, updateTrainingCourse,
   trainingInSucursal, listStudents, getStudent, studentSucursal, addStudent,
   findStudentByCodigo, removeStudent, setStudentTeoria, setPractica, cerrarAlumno,
 } from '../services/training.js';
 import {
-  listBanks, getBank, upsertBank, listQuestions, addQuestion,
+  listBanks, getBank, upsertBank, listQuestions, addQuestion, addQuestionsBulk,
   deleteQuestion, habilitarExamen, getSession, listSessionsByStudent,
   pendingSessionForStudent, iniciarSesion, entregarExamen, validarExamen,
   type PresentedQuestion,
 } from '../services/exams.js';
 import {
-  emitirCertificado, getByStudent, verificar, verifyUrl, anular,
+  emitirCertificado, getByStudent, verificar, verifyUrl, anular, renderPdf,
   type CertificateData,
 } from '../services/certificates.js';
 
@@ -42,9 +42,9 @@ export function makeFase2Router(): Router {
     res.json(EXAM_CATEGORIES);
   });
 
-  // Instructores disponibles (todos los usuarios del panel pueden serlo).
+  // Instructores disponibles para asignar a una comisión (rol instructor o admin).
   router.get('/instructores', requireAuth, requireAdmin, async (_req, res) => {
-    res.json(await listAdmins());
+    res.json(await listInstructores());
   });
 
   // ======================= BANCOS DE PREGUNTAS (admin) =======================
@@ -102,6 +102,39 @@ export function makeFase2Router(): Router {
     res.status(201).json(await addQuestion({
       bankId: req.params.id, enunciado: enunciado.trim(), opciones: ops, correcta: idx, orden: toInt(orden),
     }));
+  });
+
+  // Importación masiva de preguntas (Excel/CSV parseado en el panel). Recibe un
+  // array ya validado y lo inserta en una transacción.
+  router.post('/exam-banks/:id/questions/bulk', requireAuth, requireAdmin, async (req, res) => {
+    const bank = await getBank(req.params.id);
+    if (!bank) {
+      res.status(404).json({ error: 'Banco no encontrado' });
+      return;
+    }
+    const { preguntas } = req.body as { preguntas?: unknown };
+    if (!Array.isArray(preguntas) || preguntas.length === 0) {
+      res.status(400).json({ error: 'No hay preguntas para importar' });
+      return;
+    }
+    const limpias: { enunciado: string; opciones: string[]; correcta: number }[] = [];
+    for (let i = 0; i < preguntas.length; i++) {
+      const p = preguntas[i] as { enunciado?: unknown; opciones?: unknown; correcta?: unknown };
+      const enunciado = typeof p.enunciado === 'string' ? p.enunciado.trim() : '';
+      const opciones = Array.isArray(p.opciones) ? p.opciones.map((o) => String(o).trim()).filter(Boolean) : [];
+      const correcta = toInt(p.correcta) ?? -1;
+      if (!enunciado || opciones.length < 2) {
+        res.status(400).json({ error: `Fila ${i + 1}: enunciado y al menos 2 opciones son requeridos` });
+        return;
+      }
+      if (correcta < 0 || correcta >= opciones.length) {
+        res.status(400).json({ error: `Fila ${i + 1}: la opción correcta está fuera de rango` });
+        return;
+      }
+      limpias.push({ enunciado, opciones, correcta });
+    }
+    const n = await addQuestionsBulk(req.params.id, limpias);
+    res.status(201).json({ importadas: n });
   });
 
   router.delete('/exam-questions/:id', requireAuth, requireAdmin, async (req, res) => {
@@ -301,6 +334,21 @@ export function makeFase2Router(): Router {
       return;
     }
     res.json({ ...cert, verifyUrl: verifyUrl(cert.codigo_verif) });
+  });
+
+  // PDF del certificado (con QR embebido). El token va en la query porque una
+  // descarga por <a> no puede mandar el header Authorization.
+  router.get('/students/:id/certificate/pdf', requireAuth, async (req, res) => {
+    if (!(await ensureStudentAccess(req, res, req.params.id))) return;
+    const cert = await getByStudent(req.params.id);
+    if (!cert) {
+      res.status(404).json({ error: 'Sin certificado' });
+      return;
+    }
+    const pdf = await renderPdf(cert);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="certificado-${cert.serial}.pdf"`);
+    res.send(pdf);
   });
 
   router.post('/certificates/:id/anular', requireAuth, requireAdmin, async (req, res) => {

@@ -134,6 +134,63 @@ export default function BancosPage() {
   );
 }
 
+/** Parser CSV mínimo (RFC 4180): soporta comillas y comas dentro de campos. */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  const s = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (s[i + 1] === '"') { field += '"'; i++; } else inQuotes = false;
+      } else field += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else field += ch;
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim() !== ''));
+}
+
+type ParsedQ = { enunciado: string; opciones: string[]; correcta: number };
+
+/**
+ * Interpreta las filas del CSV. Formato: enunciado, opción 1, opción 2, … ,
+ * correcta (número 1-based de la opción correcta, en la última columna). La
+ * primera fila se descarta si parece encabezado (última celda no numérica).
+ */
+function rowsToQuestions(rows: string[][]): { ok: ParsedQ[]; errores: string[] } {
+  const ok: ParsedQ[] = [];
+  const errores: string[] = [];
+  rows.forEach((r, idx) => {
+    const cells = r.map((c) => c.trim());
+    const last = cells[cells.length - 1];
+    // Encabezado: primera fila con última celda no numérica.
+    if (idx === 0 && !/^\d+$/.test(last)) return;
+    const enunciado = cells[0] ?? '';
+    const correcta1 = Number(last);
+    const opciones = cells.slice(1, -1).filter(Boolean);
+    if (!enunciado || opciones.length < 2 || !Number.isInteger(correcta1)) {
+      errores.push(`Fila ${idx + 1}: revisá enunciado, opciones (mín. 2) y nº de correcta`);
+      return;
+    }
+    if (correcta1 < 1 || correcta1 > opciones.length) {
+      errores.push(`Fila ${idx + 1}: la correcta (${correcta1}) está fuera de rango`);
+      return;
+    }
+    ok.push({ enunciado, opciones, correcta: correcta1 - 1 });
+  });
+  return { ok, errores };
+}
+
+const CSV_TEMPLATE =
+  'enunciado,opcion 1,opcion 2,opcion 3,opcion 4,correcta\n' +
+  '"¿Qué indica una línea amarilla continua?","Se puede adelantar","Prohibido cruzarla","Zona de estacionamiento","Carril de colectivos",2\n';
+
 function QuestionManager({ bankId, onCount }: { bankId: string; onCount: () => Promise<void> }) {
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [enunciado, setEnunciado] = useState('');
@@ -141,10 +198,58 @@ function QuestionManager({ bankId, onCount }: { bankId: string; onCount: () => P
   const [correcta, setCorrecta] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // Importación por CSV.
+  const [preview, setPreview] = useState<ParsedQ[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
+
   async function reload() {
     setQuestions(await api.bankQuestions(bankId));
   }
   useEffect(() => { void reload(); }, [bankId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const { ok, errores } = rowsToQuestions(parseCsv(String(reader.result ?? '')));
+      setPreview(ok);
+      setImportErrors(errores);
+      setError(null);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  async function doImport() {
+    if (preview.length === 0) return;
+    setImporting(true);
+    setError(null);
+    try {
+      const { importadas } = await api.importQuestions(bankId, preview);
+      setPreview([]);
+      setImportErrors([]);
+      await reload();
+      await onCount();
+      setError(null);
+      alert(`✅ ${importadas} preguntas importadas.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron importar');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function downloadTemplate() {
+    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'plantilla-preguntas.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -172,6 +277,51 @@ function QuestionManager({ bankId, onCount }: { bankId: string; onCount: () => P
     <section style={{ ...cardStyle, borderColor: '#cbd5e1' }}>
       <h3 style={{ margin: '0 0 12px' }}>Preguntas del banco ({questions.length})</h3>
       {error && <div style={{ ...errorStyle, marginBottom: 12 }}>{error}</div>}
+
+      {/* Importación masiva desde Excel/CSV */}
+      <div style={{ border: '1px dashed #cbd5e1', borderRadius: 10, padding: 14, marginBottom: 18, background: '#f8fafc' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <strong style={{ fontSize: 14 }}>Importar desde Excel / CSV</strong>
+          <button type="button" onClick={downloadTemplate} style={linkBtn}>Descargar plantilla</button>
+          <label style={{ ...primaryBtn, display: 'inline-block' }}>
+            Elegir archivo CSV
+            <input type="file" accept=".csv,text/csv" onChange={onFile} style={{ display: 'none' }} />
+          </label>
+        </div>
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#64748b' }}>
+          Desde Excel: <em>Archivo → Guardar como → CSV</em>. Columnas: <code>enunciado</code>,
+          una columna por opción, y la última columna con el <strong>número de la opción
+          correcta</strong> (1, 2, 3…). La primera fila puede ser el encabezado.
+        </p>
+
+        {importErrors.length > 0 && (
+          <div style={{ ...errorStyle, marginTop: 10 }}>
+            {importErrors.slice(0, 5).map((e, i) => <div key={i}>{e}</div>)}
+            {importErrors.length > 5 && <div>…y {importErrors.length - 5} más.</div>}
+          </div>
+        )}
+
+        {preview.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <p style={{ margin: '0 0 8px', fontSize: 13, color: '#166534' }}>
+              {preview.length} preguntas listas para importar. Vista previa:
+            </p>
+            <ol style={{ margin: 0, paddingLeft: 18, maxHeight: 180, overflow: 'auto', fontSize: 13 }}>
+              {preview.slice(0, 8).map((q, i) => (
+                <li key={i}>{q.enunciado} <span style={{ color: '#16a34a' }}>→ {q.opciones[q.correcta]}</span></li>
+              ))}
+            </ol>
+            <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
+              <button type="button" onClick={doImport} disabled={importing} style={{ ...primaryBtn, background: '#16a34a' }}>
+                {importing ? 'Importando…' : `Importar ${preview.length} preguntas`}
+              </button>
+              <button type="button" onClick={() => { setPreview([]); setImportErrors([]); }} style={linkBtn}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <form onSubmit={add} style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
         <input value={enunciado} onChange={(e) => setEnunciado(e.target.value)} placeholder="Enunciado de la pregunta" style={inputStyle} />
