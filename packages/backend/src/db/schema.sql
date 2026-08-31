@@ -121,25 +121,10 @@ ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_role_check;
 ALTER TABLE admin_users
   ADD CONSTRAINT admin_users_role_check CHECK (role IN ('admin','operador','instructor'));
 
--- Plantillas de examen (Fase 2): el curso puede referenciar una plantilla y
--- la sesión guarda la nota mínima con la que se habilitó (para bases ya creadas).
-ALTER TABLE training_courses
-  ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES exam_templates(id) ON DELETE SET NULL;
-ALTER TABLE exam_sessions
-  ADD COLUMN IF NOT EXISTS nota_minima INT;
-
--- Cupo de asientos por curso y baja de alumnos (para bases ya creadas).
-ALTER TABLE training_courses
-  ADD COLUMN IF NOT EXISTS cupo_maximo INT;
-ALTER TABLE course_students
-  ADD COLUMN IF NOT EXISTS baja_motivo TEXT;
-ALTER TABLE course_students
-  ADD COLUMN IF NOT EXISTS baja_at TIMESTAMPTZ;
--- Estado 'baja' para el alumno que abandona o se da de baja (conserva historial).
-ALTER TABLE course_students DROP CONSTRAINT IF EXISTS course_students_estado_check;
-ALTER TABLE course_students
-  ADD CONSTRAINT course_students_estado_check
-  CHECK (estado IN ('cursando','teoria_aprobada','teoria_desaprobada','aprobado','desaprobado','baja'));
+-- NOTA: las migraciones idempotentes de la Fase 2 (columnas/constraints sobre
+-- exam_templates, training_courses, exam_sessions, course_students) viven al FINAL
+-- del archivo, después de que esas tablas se crean. Ubicarlas antes rompía la
+-- primera migración en una base nueva (referenciaban tablas aún inexistentes).
 
 -- ===========================================================================
 -- FASE 2 — Capacitación, evaluación teórica/práctica y certificación.
@@ -306,3 +291,28 @@ CREATE TABLE IF NOT EXISTS class_attendance (
 );
 CREATE INDEX IF NOT EXISTS idx_class_attendance_class ON class_attendance(class_id);
 CREATE INDEX IF NOT EXISTS idx_class_attendance_student ON class_attendance(course_student_id);
+
+-- ===========================================================================
+-- Migraciones idempotentes de la Fase 2 (para bases ya creadas).
+-- Van al FINAL: referencian tablas que se crean más arriba en este mismo archivo.
+-- En una base nueva son no-ops (las columnas ya existen en el CREATE TABLE).
+-- ===========================================================================
+
+-- Plantilla de examen del curso + nota mínima snapshot en la sesión.
+ALTER TABLE training_courses
+  ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES exam_templates(id) ON DELETE SET NULL;
+ALTER TABLE exam_sessions
+  ADD COLUMN IF NOT EXISTS nota_minima INT;
+
+-- Cupo de asientos por curso y baja de alumnos.
+ALTER TABLE training_courses
+  ADD COLUMN IF NOT EXISTS cupo_maximo INT;
+ALTER TABLE course_students
+  ADD COLUMN IF NOT EXISTS baja_motivo TEXT;
+ALTER TABLE course_students
+  ADD COLUMN IF NOT EXISTS baja_at TIMESTAMPTZ;
+-- Estado 'baja' para el alumno que abandona o se da de baja (conserva historial).
+ALTER TABLE course_students DROP CONSTRAINT IF EXISTS course_students_estado_check;
+ALTER TABLE course_students
+  ADD CONSTRAINT course_students_estado_check
+  CHECK (estado IN ('cursando','teoria_aprobada','teoria_desaprobada','aprobado','desaprobado','baja'));
