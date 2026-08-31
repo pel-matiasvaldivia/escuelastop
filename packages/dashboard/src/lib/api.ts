@@ -151,15 +151,17 @@ export interface TrainingCourse {
   instructor_email?: string | null;
   banco_categoria?: string | null;
   plantilla_nombre?: string | null;
+  cupo_maximo: number | null;
   fecha_inicio: string | null;
   fecha_fin: string | null;
   estado: TrainingEstado;
   notas: string | null;
   alumnos?: number;
+  activos?: number;
 }
 
 export type StudentEstado =
-  | 'cursando' | 'teoria_aprobada' | 'teoria_desaprobada' | 'aprobado' | 'desaprobado';
+  | 'cursando' | 'teoria_aprobada' | 'teoria_desaprobada' | 'aprobado' | 'desaprobado' | 'baja';
 
 export interface CourseStudent {
   id: string;
@@ -168,9 +170,31 @@ export interface CourseStudent {
   dni: string;
   codigo: string;
   estado: StudentEstado;
+  baja_motivo: string | null;
+  baja_at: string | null;
   practica_aprobada: boolean | null;
   practica_rubrica: { item: string; ok: boolean }[] | null;
   practica_at: string | null;
+}
+
+export interface CourseClass {
+  id: string;
+  training_course_id: string;
+  fecha: string;
+  tema: string | null;
+  presentes: number;
+  ausentes: number;
+}
+
+export interface AttendanceRecord {
+  course_student_id: string;
+  presente: boolean;
+}
+
+export interface AttendanceSummary {
+  course_student_id: string;
+  presentes: number;
+  ausentes: number;
 }
 
 export interface ExamSession {
@@ -310,7 +334,7 @@ async function get<T>(path: string): Promise<T> {
 
 /** Mutación autenticada con cuerpo JSON (POST/PATCH/DELETE). */
 async function send<T>(
-  path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown,
+  path: string, method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', body?: unknown,
 ): Promise<T> {
   const res = await fetch(`${API_URL}/api${path}`, {
     method,
@@ -603,18 +627,35 @@ export const api = {
     get<{ course: TrainingCourse; alumnos: CourseStudent[] }>(`/training-courses/${id}`),
   createTrainingCourse: (data: {
     nombre: string; courseId?: string; bankId?: string; templateId?: string; sede?: string;
-    instructorId?: string; fechaInicio?: string; fechaFin?: string; notas?: string;
+    instructorId?: string; cupoMaximo?: number | null; fechaInicio?: string; fechaFin?: string; notas?: string;
   }) => send<TrainingCourse>('/training-courses', 'POST', data),
   updateTrainingCourse: (id: string, data: Partial<{
     nombre: string; bank_id: string | null; template_id: string | null; sede: string | null;
-    instructor_id: string | null; estado: TrainingEstado; notas: string | null;
+    instructor_id: string | null; cupo_maximo: number | null; estado: TrainingEstado; notas: string | null;
   }>) => send<TrainingCourse>(`/training-courses/${id}`, 'PATCH', data),
 
   // -- Alumnos del curso --
   addStudent: (courseId: string, data: { fullName: string; dni: string }) =>
     send<CourseStudent>(`/training-courses/${courseId}/students`, 'POST', data),
+  /** Baja del alumno (conserva historial, libera asiento). */
+  bajaStudent: (id: string, motivo?: string) =>
+    send<CourseStudent>(`/students/${id}/baja`, 'POST', { motivo }),
+  /** Reactiva a un alumno dado de baja. */
+  reactivarStudent: (id: string) => send<CourseStudent>(`/students/${id}/reactivar`, 'POST'),
+  /** Borrado DEFINITIVO (solo admin; elimina el historial). */
   removeStudent: (id: string) => send<{ ok: boolean }>(`/students/${id}`, 'DELETE'),
   studentSessions: (id: string) => get<ExamSession[]>(`/students/${id}/sessions`),
+
+  // -- Asistencia --
+  courseClasses: (courseId: string) => get<CourseClass[]>(`/training-courses/${courseId}/classes`),
+  createClass: (courseId: string, data: { fecha: string; tema?: string }) =>
+    send<CourseClass>(`/training-courses/${courseId}/classes`, 'POST', data),
+  deleteClass: (id: string) => send<{ ok: boolean }>(`/classes/${id}`, 'DELETE'),
+  classAttendance: (classId: string) => get<AttendanceRecord[]>(`/classes/${classId}/attendance`),
+  saveAttendance: (classId: string, records: { studentId: string; presente: boolean }[]) =>
+    send<{ ok: boolean }>(`/classes/${classId}/attendance`, 'PUT', { records }),
+  attendanceSummary: (courseId: string) =>
+    get<AttendanceSummary[]>(`/training-courses/${courseId}/attendance-summary`),
 
   // -- Examen teórico --
   enableExam: (studentId: string) => send<ExamSession>(`/students/${studentId}/exam/enable`, 'POST'),

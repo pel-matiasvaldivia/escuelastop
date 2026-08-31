@@ -28,6 +28,7 @@ export default function CapacitacionesPage() {
   const [templateId, setTemplateId] = useState('');
   const [sede, setSede] = useState('');
   const [instructorId, setInstructorId] = useState('');
+  const [cupo, setCupo] = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -74,6 +75,7 @@ export default function CapacitacionesPage() {
         templateId: templateId || undefined,
         sede: isAdmin ? (sede || undefined) : undefined,
         instructorId: instructorId || undefined,
+        cupoMaximo: cupo ? Number(cupo) : null,
         fechaInicio: fechaInicio || undefined,
       });
       setNombre('');
@@ -149,6 +151,13 @@ export default function CapacitacionesPage() {
               </label>
             )}
             <label style={fieldStyle}>
+              <span style={labelStyle}>Cupo (asientos)</span>
+              <input
+                type="number" min={1} value={cupo} onChange={(e) => setCupo(e.target.value)}
+                placeholder="Sin límite" style={inputStyle}
+              />
+            </label>
+            <label style={fieldStyle}>
               <span style={labelStyle}>Fecha de inicio</span>
               <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} style={inputStyle} />
             </label>
@@ -177,7 +186,7 @@ export default function CapacitacionesPage() {
               <th style={th}>Curso</th>
               <th style={th}>Sucursal</th>
               <th style={th}>Instructor</th>
-              <th style={th}>Alumnos</th>
+              <th style={th}>Cupo</th>
               <th style={th}>Estado</th>
             </tr>
           </thead>
@@ -192,7 +201,7 @@ export default function CapacitacionesPage() {
                 </td>
                 <td style={td}>{c.sede ?? '—'}</td>
                 <td style={td}>{c.instructor_email ?? '—'}</td>
-                <td style={td}>{c.alumnos ?? 0}</td>
+                <td style={td}><Ocupacion activos={c.activos ?? 0} cupo={c.cupo_maximo} /></td>
                 <td style={td}><EstadoBadge estado={c.estado} /></td>
               </tr>
             ))}
@@ -203,6 +212,16 @@ export default function CapacitacionesPage() {
         </table>
       </section>
     </div>
+  );
+}
+
+function Ocupacion({ activos, cupo }: { activos: number; cupo: number | null }) {
+  if (cupo == null) return <span style={{ color: '#64748b' }}>{activos} · sin límite</span>;
+  const lleno = activos >= cupo;
+  return (
+    <span style={{ color: lleno ? '#b91c1c' : '#0f172a', fontWeight: lleno ? 600 : 400 }}>
+      {activos} / {cupo}{lleno && ' · completo'}
+    </span>
   );
 }
 

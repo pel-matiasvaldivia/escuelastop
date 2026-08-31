@@ -21,6 +21,7 @@ export interface TrainingCourse {
   template_id: string | null;
   sede: string | null;
   instructor_id: string | null;
+  cupo_maximo: number | null;
   fecha_inicio: string | null;
   fecha_fin: string | null;
   estado: TrainingEstado;
@@ -34,11 +35,12 @@ export interface TrainingCourseView extends TrainingCourse {
   instructor_email: string | null;
   banco_categoria: string | null;
   plantilla_nombre: string | null;
-  alumnos: number;
+  alumnos: number;   // matriculados totales (incluye bajas)
+  activos: number;   // matriculados que NO están dados de baja (ocupan asiento)
 }
 
 export type StudentEstado =
-  | 'cursando' | 'teoria_aprobada' | 'teoria_desaprobada' | 'aprobado' | 'desaprobado';
+  | 'cursando' | 'teoria_aprobada' | 'teoria_desaprobada' | 'aprobado' | 'desaprobado' | 'baja';
 
 export interface CourseStudent {
   id: string;
@@ -49,6 +51,8 @@ export interface CourseStudent {
   dni: string;
   codigo: string;
   estado: StudentEstado;
+  baja_motivo: string | null;
+  baja_at: string | null;
   practica_aprobada: boolean | null;
   practica_rubrica: { item: string; ok: boolean }[] | null;
   practica_por: string | null;
@@ -80,12 +84,13 @@ export async function listTrainingCourses(
     values.push(sucursal);
     where = `WHERE tc.sede = $1`;
   }
-  const res = await query<TrainingCourseView & { alumnos: string }>(
+  const res = await query<TrainingCourseView & { alumnos: string; activos: string }>(
     `SELECT tc.*,
             u.email      AS instructor_email,
             COALESCE(b.categoria, tb.categoria) AS banco_categoria,
             t.nombre     AS plantilla_nombre,
-            COUNT(cs.id) AS alumnos
+            COUNT(cs.id) AS alumnos,
+            COUNT(cs.id) FILTER (WHERE cs.estado <> 'baja') AS activos
        FROM training_courses tc
        LEFT JOIN admin_users u    ON u.id = tc.instructor_id
        LEFT JOIN exam_banks  b    ON b.id = tc.bank_id
@@ -97,7 +102,7 @@ export async function listTrainingCourses(
       ORDER BY tc.created_at DESC`,
     values,
   );
-  return res.rows.map((r) => ({ ...r, alumnos: Number(r.alumnos) }));
+  return res.rows.map((r) => ({ ...r, alumnos: Number(r.alumnos), activos: Number(r.activos) }));
 }
 
 export async function getTrainingCourse(id: string): Promise<TrainingCourse | null> {
@@ -107,12 +112,13 @@ export async function getTrainingCourse(id: string): Promise<TrainingCourse | nu
 
 /** Curso con datos derivados (instructor, categoría, plantilla) para el detalle. */
 export async function getTrainingCourseView(id: string): Promise<TrainingCourseView | null> {
-  const res = await query<TrainingCourseView & { alumnos: string }>(
+  const res = await query<TrainingCourseView & { alumnos: string; activos: string }>(
     `SELECT tc.*,
             u.email      AS instructor_email,
             COALESCE(b.categoria, tb.categoria) AS banco_categoria,
             t.nombre     AS plantilla_nombre,
-            COUNT(cs.id) AS alumnos
+            COUNT(cs.id) AS alumnos,
+            COUNT(cs.id) FILTER (WHERE cs.estado <> 'baja') AS activos
        FROM training_courses tc
        LEFT JOIN admin_users u    ON u.id = tc.instructor_id
        LEFT JOIN exam_banks  b    ON b.id = tc.bank_id
@@ -124,7 +130,7 @@ export async function getTrainingCourseView(id: string): Promise<TrainingCourseV
     [id],
   );
   const row = res.rows[0];
-  return row ? { ...row, alumnos: Number(row.alumnos) } : null;
+  return row ? { ...row, alumnos: Number(row.alumnos), activos: Number(row.activos) } : null;
 }
 
 export async function createTrainingCourse(input: {
@@ -134,18 +140,19 @@ export async function createTrainingCourse(input: {
   templateId?: string | null;
   sede?: string | null;
   instructorId?: string | null;
+  cupoMaximo?: number | null;
   fechaInicio?: string | null;
   fechaFin?: string | null;
   notas?: string | null;
 }): Promise<TrainingCourse> {
   const res = await query<TrainingCourse>(
     `INSERT INTO training_courses
-       (nombre, course_id, bank_id, template_id, sede, instructor_id, fecha_inicio, fecha_fin, notas)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+       (nombre, course_id, bank_id, template_id, sede, instructor_id, cupo_maximo, fecha_inicio, fecha_fin, notas)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
     [
       input.nombre, input.courseId ?? null, input.bankId ?? null, input.templateId ?? null,
-      input.sede ?? null, input.instructorId ?? null, input.fechaInicio ?? null,
-      input.fechaFin ?? null, input.notas ?? null,
+      input.sede ?? null, input.instructorId ?? null, input.cupoMaximo ?? null,
+      input.fechaInicio ?? null, input.fechaFin ?? null, input.notas ?? null,
     ],
   );
   return res.rows[0];
@@ -155,12 +162,14 @@ export async function updateTrainingCourse(
   id: string,
   fields: Partial<{
     nombre: string; bank_id: string | null; template_id: string | null; sede: string | null;
-    instructor_id: string | null; fecha_inicio: string | null; fecha_fin: string | null;
+    instructor_id: string | null; cupo_maximo: number | null;
+    fecha_inicio: string | null; fecha_fin: string | null;
     estado: TrainingEstado; notas: string | null;
   }>,
 ): Promise<TrainingCourse | null> {
   const allowed: (keyof typeof fields)[] = [
-    'nombre', 'bank_id', 'template_id', 'sede', 'instructor_id', 'fecha_inicio', 'fecha_fin', 'estado', 'notas',
+    'nombre', 'bank_id', 'template_id', 'sede', 'instructor_id', 'cupo_maximo',
+    'fecha_inicio', 'fecha_fin', 'estado', 'notas',
   ];
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -215,7 +224,28 @@ export async function studentSucursal(id: string): Promise<string | null | undef
   return res.rows.length ? res.rows[0].sede : undefined;
 }
 
-/** Matricula un alumno en un curso. Genera un código único (reintenta ante colisión). */
+/** Cantidad de alumnos que ocupan asiento (matriculados que no están de baja). */
+export async function countActiveStudents(trainingCourseId: string): Promise<number> {
+  const res = await query<{ n: string }>(
+    `SELECT COUNT(*) AS n FROM course_students
+      WHERE training_course_id = $1 AND estado <> 'baja'`,
+    [trainingCourseId],
+  );
+  return Number(res.rows[0]?.n ?? 0);
+}
+
+/** ¿Hay asiento libre? Devuelve true si no hay cupo definido o todavía entra. */
+async function hayCupo(trainingCourseId: string): Promise<boolean> {
+  const course = await getTrainingCourse(trainingCourseId);
+  if (!course || course.cupo_maximo == null) return true;
+  return (await countActiveStudents(trainingCourseId)) < course.cupo_maximo;
+}
+
+/**
+ * Matricula un alumno en un curso. Respeta el cupo de asientos. Si ya existía un
+ * alumno con ese DNI que estaba dado de baja, lo reactiva (conserva su historial)
+ * en vez de duplicarlo. Genera un código único (reintenta ante colisión).
+ */
 export async function addStudent(input: {
   trainingCourseId: string;
   fullName: string;
@@ -223,6 +253,37 @@ export async function addStudent(input: {
   enrollmentId?: string | null;
   contactId?: string | null;
 }): Promise<CourseStudent | { error: string }> {
+  const dni = input.dni.trim();
+  const fullName = input.fullName.trim();
+
+  // ¿Ya existe (activo o de baja) con ese DNI en el curso?
+  const existing = await query<CourseStudent>(
+    'SELECT * FROM course_students WHERE training_course_id = $1 AND dni = $2',
+    [input.trainingCourseId, dni],
+  );
+  const prev = existing.rows[0];
+  if (prev) {
+    if (prev.estado !== 'baja') {
+      return { error: 'Ese DNI ya está matriculado en el curso' };
+    }
+    // Reactivar una baja ocupa un asiento: verificamos el cupo.
+    if (!(await hayCupo(input.trainingCourseId))) {
+      return { error: 'El curso está completo: no hay asientos disponibles' };
+    }
+    const re = await query<CourseStudent>(
+      `UPDATE course_students
+          SET estado = 'cursando', baja_motivo = NULL, baja_at = NULL,
+              full_name = $2, updated_at = now()
+        WHERE id = $1 RETURNING *`,
+      [prev.id, fullName],
+    );
+    return re.rows[0];
+  }
+
+  if (!(await hayCupo(input.trainingCourseId))) {
+    return { error: 'El curso está completo: no hay asientos disponibles' };
+  }
+
   for (let intento = 0; intento < 5; intento++) {
     try {
       const res = await query<CourseStudent>(
@@ -230,7 +291,7 @@ export async function addStudent(input: {
            (training_course_id, full_name, dni, codigo, enrollment_id, contact_id)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [
-          input.trainingCourseId, input.fullName.trim(), input.dni.trim(),
+          input.trainingCourseId, fullName, dni,
           generarCodigo(), input.enrollmentId ?? null, input.contactId ?? null,
         ],
       );
@@ -260,6 +321,38 @@ export async function findStudentByCodigo(
   return res.rows[0] ?? null;
 }
 
+/**
+ * Da de baja a un alumno (abandono / se dio de baja). NO lo borra: conserva su
+ * historial (exámenes, asistencia) y libera el asiento. Reversible con reactivar.
+ */
+export async function darDeBaja(id: string, motivo?: string | null): Promise<CourseStudent | null> {
+  const res = await query<CourseStudent>(
+    `UPDATE course_students
+        SET estado = 'baja', baja_motivo = $2, baja_at = now(), updated_at = now()
+      WHERE id = $1 RETURNING *`,
+    [id, motivo?.trim() || null],
+  );
+  return res.rows[0] ?? null;
+}
+
+/** Reactiva a un alumno dado de baja (vuelve a 'cursando'). Verifica el cupo. */
+export async function reactivarStudent(id: string): Promise<CourseStudent | { error: string } | null> {
+  const student = await getStudent(id);
+  if (!student) return null;
+  if (student.estado !== 'baja') return student; // ya activo, nada que hacer
+  if (!(await hayCupo(student.training_course_id))) {
+    return { error: 'El curso está completo: no hay asientos disponibles' };
+  }
+  const res = await query<CourseStudent>(
+    `UPDATE course_students
+        SET estado = 'cursando', baja_motivo = NULL, baja_at = NULL, updated_at = now()
+      WHERE id = $1 RETURNING *`,
+    [id],
+  );
+  return res.rows[0] ?? null;
+}
+
+/** Borrado DEFINITIVO del alumno (elimina también su historial). Solo admin. */
 export async function removeStudent(id: string): Promise<boolean> {
   const res = await query('DELETE FROM course_students WHERE id = $1', [id]);
   return (res.rowCount ?? 0) > 0;
@@ -306,4 +399,122 @@ export async function cerrarAlumno(id: string): Promise<CourseStudent | null> {
     [id, aprobado ? 'aprobado' : 'desaprobado'],
   );
   return res.rows[0] ?? null;
+}
+
+// ------------------------------ Asistencia ---------------------------------
+
+export interface CourseClass {
+  id: string;
+  training_course_id: string;
+  fecha: string;
+  tema: string | null;
+  created_at: string;
+}
+
+/** Clase con el conteo de presentes (para el listado). */
+export interface CourseClassView extends CourseClass {
+  presentes: number;
+  ausentes: number;
+}
+
+export interface AttendanceRecord {
+  course_student_id: string;
+  presente: boolean;
+}
+
+/** Resumen de asistencia por alumno en un curso. */
+export interface AttendanceSummary {
+  course_student_id: string;
+  presentes: number;
+  ausentes: number;
+}
+
+/** Lista las clases de un curso, con cuántos presentes/ausentes tuvo cada una. */
+export async function listClasses(trainingCourseId: string): Promise<CourseClassView[]> {
+  const res = await query<CourseClassView & { presentes: string; ausentes: string }>(
+    `SELECT cc.*,
+            COUNT(a.id) FILTER (WHERE a.presente)     AS presentes,
+            COUNT(a.id) FILTER (WHERE NOT a.presente) AS ausentes
+       FROM course_classes cc
+       LEFT JOIN class_attendance a ON a.class_id = cc.id
+      WHERE cc.training_course_id = $1
+      GROUP BY cc.id
+      ORDER BY cc.fecha DESC, cc.created_at DESC`,
+    [trainingCourseId],
+  );
+  return res.rows.map((r) => ({ ...r, presentes: Number(r.presentes), ausentes: Number(r.ausentes) }));
+}
+
+export async function getClass(id: string): Promise<CourseClass | null> {
+  const res = await query<CourseClass>('SELECT * FROM course_classes WHERE id = $1', [id]);
+  return res.rows[0] ?? null;
+}
+
+/** Curso al que pertenece una clase (para el scoping de operadores). */
+export async function classCourseId(id: string): Promise<string | null> {
+  const res = await query<{ training_course_id: string }>(
+    'SELECT training_course_id FROM course_classes WHERE id = $1',
+    [id],
+  );
+  return res.rows[0]?.training_course_id ?? null;
+}
+
+export async function createClass(
+  trainingCourseId: string, fecha: string, tema?: string | null,
+): Promise<CourseClass> {
+  const res = await query<CourseClass>(
+    `INSERT INTO course_classes (training_course_id, fecha, tema)
+     VALUES ($1, $2, $3) RETURNING *`,
+    [trainingCourseId, fecha, tema?.trim() || null],
+  );
+  return res.rows[0];
+}
+
+export async function deleteClass(id: string): Promise<boolean> {
+  const res = await query('DELETE FROM course_classes WHERE id = $1', [id]);
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** Registros de asistencia guardados para una clase. */
+export async function getAttendance(classId: string): Promise<AttendanceRecord[]> {
+  const res = await query<AttendanceRecord>(
+    'SELECT course_student_id, presente FROM class_attendance WHERE class_id = $1',
+    [classId],
+  );
+  return res.rows;
+}
+
+/** Guarda (upsert) la asistencia de una clase para varios alumnos. */
+export async function setAttendance(
+  classId: string, records: { studentId: string; presente: boolean }[],
+): Promise<boolean> {
+  for (const r of records) {
+    await query(
+      `INSERT INTO class_attendance (class_id, course_student_id, presente)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (class_id, course_student_id)
+       DO UPDATE SET presente = EXCLUDED.presente, updated_at = now()`,
+      [classId, r.studentId, r.presente],
+    );
+  }
+  return true;
+}
+
+/** Resumen de asistencia por alumno (presentes/ausentes) en todo el curso. */
+export async function attendanceSummary(trainingCourseId: string): Promise<AttendanceSummary[]> {
+  const res = await query<AttendanceSummary & { presentes: string; ausentes: string }>(
+    `SELECT a.course_student_id,
+            COUNT(*) FILTER (WHERE a.presente)     AS presentes,
+            COUNT(*) FILTER (WHERE NOT a.presente) AS ausentes
+       FROM class_attendance a
+       JOIN course_classes cc ON cc.id = a.class_id
+      WHERE cc.training_course_id = $1
+      GROUP BY a.course_student_id`,
+    [trainingCourseId],
+  );
+  return res.rows.map((r) => ({
+    course_student_id: r.course_student_id,
+    presentes: Number(r.presentes),
+    ausentes: Number(r.ausentes),
+  }));
 }
