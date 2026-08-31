@@ -143,7 +143,7 @@ export async function listAdmins(): Promise<AdminUserPublic[]> {
   return res.rows;
 }
 
-/** Usuarios que pueden dictar/evaluar comisiones (instructores y admins). */
+/** Usuarios que pueden dictar/evaluar cursos (instructores y admins). */
 export async function listInstructores(): Promise<AdminUserPublic[]> {
   const res = await query<AdminUserPublic>(
     `SELECT ${PUBLIC_COLS} FROM admin_users WHERE role IN ('instructor','admin') ORDER BY email`,

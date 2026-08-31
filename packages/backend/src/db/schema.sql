@@ -121,7 +121,7 @@ ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_role_check;
 ALTER TABLE admin_users
   ADD CONSTRAINT admin_users_role_check CHECK (role IN ('admin','operador','instructor'));
 
--- Plantillas de examen (Fase 2): la comisión puede referenciar una plantilla y
+-- Plantillas de examen (Fase 2): el curso puede referenciar una plantilla y
 -- la sesión guarda la nota mínima con la que se habilitó (para bases ya creadas).
 ALTER TABLE training_courses
   ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES exam_templates(id) ON DELETE SET NULL;
@@ -131,7 +131,7 @@ ALTER TABLE exam_sessions
 -- ===========================================================================
 -- FASE 2 — Capacitación, evaluación teórica/práctica y certificación.
 --
--- Flujo: se arma una COMISIÓN (training_courses) de un curso en una sucursal a
+-- Flujo: se arma un CURSO (training_courses) en una sucursal a
 -- cargo de un instructor; se matriculan ALUMNOS (course_students), cada uno con
 -- un código único. El instructor HABILITA el examen teórico (exam_sessions), el
 -- alumno lo rinde en una tablet con DNI + código, la plataforma corrige solo, el
@@ -187,11 +187,11 @@ CREATE TABLE IF NOT EXISTS exam_templates (
 );
 CREATE INDEX IF NOT EXISTS idx_exam_templates_bank ON exam_templates(bank_id);
 
--- Comisiones / cohortes: una instancia concreta de un curso, en una sucursal, a
+-- Cursos / cohortes: una instancia concreta de capacitación, en una sucursal, a
 -- cargo de un instructor, con el banco de examen que le corresponde.
 CREATE TABLE IF NOT EXISTS training_courses (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  nombre        TEXT NOT NULL,                -- ej: "B1 — Comisión Agosto Casa Central"
+  nombre        TEXT NOT NULL,                -- ej: "B1 — Agosto Casa Central"
   course_id     TEXT,                         -- id del catálogo (catalog.ts), informativo
   bank_id       UUID REFERENCES exam_banks(id),        -- legacy: categoría directa
   template_id   UUID REFERENCES exam_templates(id) ON DELETE SET NULL, -- plantilla de examen
@@ -207,7 +207,7 @@ CREATE TABLE IF NOT EXISTS training_courses (
 );
 CREATE INDEX IF NOT EXISTS idx_training_courses_sede ON training_courses(sede);
 
--- Alumnos matriculados en una comisión. Puede venir de una inscripción de la
+-- Alumnos matriculados en un curso. Puede venir de una inscripción de la
 -- Fase 1 (enrollment) o cargarse a mano. Cada alumno tiene un código único con
 -- el que inicia el examen en la tablet.
 CREATE TABLE IF NOT EXISTS course_students (

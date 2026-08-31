@@ -2,11 +2,11 @@ import { randomInt } from 'node:crypto';
 import { query } from '../db/index.js';
 
 /**
- * Capacitación de la Fase 2: comisiones (cohortes) y sus alumnos.
+ * Capacitación de la Fase 2: cursos (cohortes) y sus alumnos.
  *
- * Una COMISIÓN (training_courses) es una instancia concreta de un curso, en una
+ * Un CURSO (training_courses) es una instancia concreta de capacitación, en una
  * sucursal, a cargo de un instructor y con el banco de examen que le corresponde.
- * Los ALUMNOS (course_students) se matriculan a la comisión — desde una
+ * Los ALUMNOS (course_students) se matriculan al curso — desde una
  * inscripción de la Fase 1 o cargados a mano — y cada uno recibe un código único
  * con el que inicia el examen en la tablet.
  */
@@ -29,7 +29,7 @@ export interface TrainingCourse {
   updated_at: string;
 }
 
-/** Comisión con datos derivados para el listado del panel. */
+/** Curso con datos derivados para el listado del panel. */
 export interface TrainingCourseView extends TrainingCourse {
   instructor_email: string | null;
   banco_categoria: string | null;
@@ -57,7 +57,7 @@ export interface CourseStudent {
   updated_at: string;
 }
 
-// ------------------------------ Comisiones ---------------------------------
+// ------------------------------ Cursos ---------------------------------
 
 /** Genera un código corto legible para el alumno (evita 0/O y 1/I). */
 function generarCodigo(): string {
@@ -68,7 +68,7 @@ function generarCodigo(): string {
 }
 
 /**
- * Lista comisiones para el panel. `sucursal` aplica el scoping de operadores
+ * Lista cursos para el panel. `sucursal` aplica el scoping de operadores
  * (solo ven las de su sede); el admin no pasa filtro y ve todas.
  */
 export async function listTrainingCourses(
@@ -105,7 +105,7 @@ export async function getTrainingCourse(id: string): Promise<TrainingCourse | nu
   return res.rows[0] ?? null;
 }
 
-/** Comisión con datos derivados (instructor, categoría, plantilla) para el detalle. */
+/** Curso con datos derivados (instructor, categoría, plantilla) para el detalle. */
 export async function getTrainingCourseView(id: string): Promise<TrainingCourseView | null> {
   const res = await query<TrainingCourseView & { alumnos: string }>(
     `SELECT tc.*,
@@ -180,7 +180,7 @@ export async function updateTrainingCourse(
   return res.rows[0] ?? null;
 }
 
-/** ¿Esta comisión pertenece a esta sucursal? (autorización de operadores). */
+/** ¿Este curso pertenece a esta sucursal? (autorización de operadores). */
 export async function trainingInSucursal(id: string, sucursal: string): Promise<boolean> {
   const res = await query<{ ok: boolean }>(
     'SELECT TRUE AS ok FROM training_courses WHERE id = $1 AND sede = $2',
@@ -204,7 +204,7 @@ export async function getStudent(id: string): Promise<CourseStudent | null> {
   return res.rows[0] ?? null;
 }
 
-/** Sucursal de la comisión de un alumno (para el scoping de operadores). */
+/** Sucursal del curso de un alumno (para el scoping de operadores). */
 export async function studentSucursal(id: string): Promise<string | null | undefined> {
   const res = await query<{ sede: string | null }>(
     `SELECT tc.sede FROM course_students cs
@@ -215,7 +215,7 @@ export async function studentSucursal(id: string): Promise<string | null | undef
   return res.rows.length ? res.rows[0].sede : undefined;
 }
 
-/** Matricula un alumno en una comisión. Genera un código único (reintenta ante colisión). */
+/** Matricula un alumno en un curso. Genera un código único (reintenta ante colisión). */
 export async function addStudent(input: {
   trainingCourseId: string;
   fullName: string;
@@ -240,7 +240,7 @@ export async function addStudent(input: {
       // 23505 = unique_violation. Puede ser el DNI (alumno repetido) o el código.
       if (code === '23505') {
         const detail = String((err as { detail?: string }).detail ?? '');
-        if (detail.includes('dni')) return { error: 'Ese DNI ya está matriculado en la comisión' };
+        if (detail.includes('dni')) return { error: 'Ese DNI ya está matriculado en el curso' };
         continue; // colisión de código: reintenta
       }
       throw err;

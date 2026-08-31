@@ -165,7 +165,7 @@ function TemplatesSection({
   }
 
   async function remove(id: string) {
-    if (!window.confirm('¿Eliminar la plantilla? Las comisiones que la usaban quedan sin examen asignado.')) return;
+    if (!window.confirm('¿Eliminar la plantilla? Los cursos que la usaban quedan sin examen asignado.')) return;
     await api.deleteTemplate(id);
     await onChange();
   }
@@ -175,7 +175,7 @@ function TemplatesSection({
       <h3 style={{ margin: '0 0 4px' }}>Plantillas de examen</h3>
       <p style={{ margin: '0 0 12px', fontSize: 13, color: '#64748b' }}>
         Una plantilla toma una categoría de preguntas y define cómo se arma el examen.
-        La comisión elige una plantilla.
+        El curso elige una plantilla.
       </p>
       {error && <div style={{ ...errorStyle, marginBottom: 12 }}>{error}</div>}
 

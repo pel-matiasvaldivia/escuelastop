@@ -55,8 +55,8 @@ const FASE1: Step[] = [
 
 const FASE2: Step[] = [
   {
-    n: 7, accent: 'plain', title: 'Comisión y matrícula',
-    desc: 'El instructor (o el admin) abre una comisión — curso, sucursal y la plantilla de examen de la categoría — y matricula a los alumnos. Cada alumno recibe un código único para rendir.',
+    n: 7, accent: 'plain', title: 'Curso y matrícula',
+    desc: 'El instructor (o el admin) abre un curso — categoría, sucursal y la plantilla de examen de la categoría — y matricula a los alumnos. Cada alumno recibe un código único para rendir.',
     chips: [{ label: 'Instructor', kind: 'who' }, { label: 'Código por alumno' }],
   },
   {

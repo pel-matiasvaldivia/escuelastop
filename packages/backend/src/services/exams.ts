@@ -199,7 +199,7 @@ function shuffle<T>(arr: T[]): T[] {
 /**
  * El instructor habilita el examen de un alumno. Sortea las preguntas de la
  * categoría (bankId) según la cantidad y nota mínima resueltas (de la plantilla
- * de la comisión, o del propio banco como fallback) y guarda ese snapshot en la
+ * del curso, o del propio banco como fallback) y guarda ese snapshot en la
  * sesión, para que la corrección sea estable aunque la plantilla cambie después.
  */
 export async function habilitarExamen(
@@ -208,7 +208,7 @@ export async function habilitarExamen(
   instructor: string,
 ): Promise<ExamSession | { error: string }> {
   const bank = await getBank(opts.bankId);
-  if (!bank) return { error: 'La comisión no tiene una categoría de examen asociada' };
+  if (!bank) return { error: 'El curso no tiene una categoría de examen asociada' };
 
   const all = await listQuestions(opts.bankId);
   const activas = all.filter((q) => q.activa);

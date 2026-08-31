@@ -597,7 +597,7 @@ export const api = {
   }>) => send<ExamTemplate>(`/exam-templates/${id}`, 'PATCH', data),
   deleteTemplate: (id: string) => send<{ ok: boolean }>(`/exam-templates/${id}`, 'DELETE'),
 
-  // -- Comisiones --
+  // -- Cursos --
   trainingCourses: () => get<TrainingCourse[]>('/training-courses'),
   trainingCourse: (id: string) =>
     get<{ course: TrainingCourse; alumnos: CourseStudent[] }>(`/training-courses/${id}`),
@@ -610,7 +610,7 @@ export const api = {
     instructor_id: string | null; estado: TrainingEstado; notas: string | null;
   }>) => send<TrainingCourse>(`/training-courses/${id}`, 'PATCH', data),
 
-  // -- Alumnos de la comisión --
+  // -- Alumnos del curso --
   addStudent: (courseId: string, data: { fullName: string; dni: string }) =>
     send<CourseStudent>(`/training-courses/${courseId}/students`, 'POST', data),
   removeStudent: (id: string) => send<{ ok: boolean }>(`/students/${id}`, 'DELETE'),

@@ -43,7 +43,7 @@ export function makeFase2Router(): Router {
     res.json(EXAM_CATEGORIES);
   });
 
-  // Instructores disponibles para asignar a una comisión (rol instructor o admin).
+  // Instructores disponibles para asignar a un curso (rol instructor o admin).
   router.get('/instructores', requireAuth, requireInstructorOrAdmin, async (_req, res) => {
     res.json(await listInstructores());
   });
@@ -201,7 +201,7 @@ export function makeFase2Router(): Router {
     res.json({ ok: await deleteTemplate(req.params.id) });
   });
 
-  // =========================== COMISIONES ===========================
+  // =========================== CURSOS ===========================
   router.get('/training-courses', requireAuth, async (req, res) => {
     res.json(await listTrainingCourses(scopeOf(req)));
   });
@@ -210,10 +210,10 @@ export function makeFase2Router(): Router {
     const { nombre, courseId, bankId, templateId, sede, instructorId, fechaInicio, fechaFin, notas } =
       req.body as Record<string, unknown>;
     if (typeof nombre !== 'string' || !nombre.trim()) {
-      res.status(400).json({ error: 'El nombre de la comisión es requerido' });
+      res.status(400).json({ error: 'El nombre del curso es requerido' });
       return;
     }
-    // El operador solo abre comisiones de su sucursal; el admin elige la sede.
+    // El operador solo abre cursos de su sucursal; el admin elige la sede.
     const scope = scopeOf(req);
     const sedeFinal = scope ?? (typeof sede === 'string' ? sede.trim() : undefined) ?? undefined;
     if (sedeFinal && !isSucursalActiva(sedeFinal)) {
@@ -242,11 +242,11 @@ export function makeFase2Router(): Router {
     res.status(201).json(course);
   });
 
-  // Detalle de una comisión: datos + alumnos.
+  // Detalle de un curso: datos + alumnos.
   router.get('/training-courses/:id', requireAuth, async (req, res) => {
     const course = await getTrainingCourseView(req.params.id);
     if (!course) {
-      res.status(404).json({ error: 'Comisión no encontrada' });
+      res.status(404).json({ error: 'Curso no encontrado' });
       return;
     }
     if (!(await ensureTrainingAccess(req, res, req.params.id))) return;
@@ -267,7 +267,7 @@ export function makeFase2Router(): Router {
     res.json(updated);
   });
 
-  // ---- Alumnos de la comisión ----
+  // ---- Alumnos del curso ----
   router.post('/training-courses/:id/students', requireAuth, async (req, res) => {
     if (!(await ensureTrainingAccess(req, res, req.params.id))) return;
     const { fullName, dni, enrollmentId, contactId } = req.body as {
@@ -309,10 +309,10 @@ export function makeFase2Router(): Router {
     }
     const course = await getTrainingCourse(student.training_course_id);
     if (!course) {
-      res.status(404).json({ error: 'Comisión no encontrada' });
+      res.status(404).json({ error: 'Curso no encontrado' });
       return;
     }
-    // Preferimos la plantilla de la comisión (categoría + parámetros); si no hay,
+    // Preferimos la plantilla del curso (categoría + parámetros); si no hay,
     // caemos a la categoría directa (bank_id) por compatibilidad.
     const tpl = course.template_id ? await getTemplate(course.template_id) : null;
     const opts = tpl
@@ -321,7 +321,7 @@ export function makeFase2Router(): Router {
         ? { bankId: course.bank_id }
         : null;
     if (!opts) {
-      res.status(400).json({ error: 'La comisión no tiene plantilla ni categoría de examen asignada' });
+      res.status(400).json({ error: 'El curso no tiene plantilla ni categoría de examen asignada' });
       return;
     }
     const result = await habilitarExamen(req.params.id, opts, req.admin!.email);
@@ -507,16 +507,16 @@ function toInt(v: unknown): number | undefined {
   return Number.isFinite(n) ? Math.trunc(n) : undefined;
 }
 
-/** Autoriza a un operador a acceder a una comisión (el admin siempre pasa). */
+/** Autoriza a un operador a acceder a un curso (el admin siempre pasa). */
 async function ensureTrainingAccess(req: Request, res: Response, id: string): Promise<boolean> {
   const scope = scopeOf(req);
   if (scope === undefined) return true;
   if (await trainingInSucursal(id, scope)) return true;
-  res.status(403).json({ error: 'Sin acceso a esta comisión' });
+  res.status(403).json({ error: 'Sin acceso a este curso' });
   return false;
 }
 
-/** Autoriza a un operador a acceder a un alumno según la sede de su comisión. */
+/** Autoriza a un operador a acceder a un alumno según la sede de su curso. */
 async function ensureStudentAccess(req: Request, res: Response, studentId: string): Promise<boolean> {
   const scope = scopeOf(req);
   if (scope === undefined) return true;
