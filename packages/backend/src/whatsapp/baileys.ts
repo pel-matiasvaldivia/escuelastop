@@ -156,12 +156,24 @@ export class BaileysChannel implements MessagingChannel {
           );
 
           if (loggedOut) {
-            // La sesión ya no sirve: hay que volver a escanear el QR.
+            // status 401 / loggedOut: las credenciales ya no sirven (sesión
+            // cerrada desde el celular, número desvinculado, o una sesión a
+            // medio escribir de un intento previo). Reusarlas da 401 en loop y
+            // WhatsApp nunca genera el QR: hay que BORRARLAS para arrancar limpio.
             this.reconnectAttempts = 0;
-            this.setState('apagado', {
-              qr: null,
-              error: 'La sesión se cerró desde el celular. Volvé a vincular el número.',
-            });
+            try { this.sock?.end(undefined); } catch { /* noop */ }
+            this.sock = null;
+            void rm(SESSION_PATH, { recursive: true, force: true })
+              .catch(() => {})
+              .finally(() => {
+                console.log('   sesión inválida borrada; tocá "Vincular WhatsApp" para escanear un QR nuevo');
+                this.setState('apagado', {
+                  qr: null,
+                  error:
+                    'La sesión guardada ya no era válida y se limpió. ' +
+                    'Tocá "Vincular WhatsApp" para escanear el QR de nuevo.',
+                });
+              });
             return;
           }
 
