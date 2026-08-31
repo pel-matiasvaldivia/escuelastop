@@ -1,6 +1,7 @@
 import {
   makeWASocket,
   useMultiFileAuthState,
+  fetchLatestBaileysVersion,
   DisconnectReason,
   type WASocket,
 } from '@whiskeysockets/baileys';
@@ -58,6 +59,10 @@ export class BaileysChannel implements MessagingChannel {
   private starting = false;
   /** Cortar la reconexión automática cuando el operador desvincula a propósito. */
   private stopping = false;
+  /** Reintentos consecutivos de reconexión (caídas transitorias). */
+  private reconnectAttempts = 0;
+  /** Tope de reintentos antes de mostrar el error en el panel. */
+  private static readonly MAX_RECONNECTS = 5;
 
   private setState(state: ChannelState, opts: { qr?: string | null; error?: string | null } = {}) {
     this.state = state;
@@ -74,6 +79,7 @@ export class BaileysChannel implements MessagingChannel {
     this.handler = onMessage;
     if (this.state === 'conectado' || this.starting) return;
     this.stopping = false;
+    this.reconnectAttempts = 0;
     this.setState('iniciando', { qr: null, error: null });
     await this.connect();
   }
@@ -85,8 +91,26 @@ export class BaileysChannel implements MessagingChannel {
       // así no hay que reescanear el QR en cada reinicio.
       const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
 
+      // Fijamos la versión ACTUAL del protocolo de WhatsApp Web. Sin esto,
+      // Baileys usa una versión embebida que queda desfasada y WhatsApp rechaza
+      // el handshake (error 405 "Connection Failure") → nunca aparece el QR.
+      // Es la causa nº1 de que una versión pre-release de Baileys no vincule.
+      let version: [number, number, number] | undefined;
+      try {
+        const info = await fetchLatestBaileysVersion();
+        version = info.version;
+        console.log(
+          `ℹ️  WhatsApp Web versión ${version.join('.')} ` +
+            `(${info.isLatest ? 'al día' : 'desfasada respecto de la publicada'})`,
+        );
+      } catch (err) {
+        // Sin internet al registro de versiones seguimos con el default embebido.
+        console.warn('No se pudo obtener la versión de WhatsApp Web, usando la embebida:', err);
+      }
+
       const sock = makeWASocket({
         auth: state,
+        ...(version ? { version } : {}),
         // El QR lo publicamos nosotros en el panel, no en la terminal.
         printQRInTerminal: false,
         browser: ['Escuela STOP', 'Chrome', '1.0.0'],
@@ -110,18 +134,30 @@ export class BaileysChannel implements MessagingChannel {
         }
 
         if (connection === 'open') {
+          this.reconnectAttempts = 0;
           this.setState('conectado', { qr: null, error: null });
           console.log('✅ Canal WhatsApp (Baileys) conectado');
         }
 
         if (connection === 'close') {
-          const status = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode;
+          const boom = lastDisconnect?.error as Boom | undefined;
+          const status = boom?.output?.statusCode;
+          const reason = DisconnectReason[status as number] ?? 'desconocido';
+          const detail = boom?.message ?? '';
           const loggedOut = status === DisconnectReason.loggedOut;
 
           if (this.stopping) return;
 
+          // Log SIEMPRE (aunque el logger de Baileys esté en silent): sin esto
+          // los fallos de handshake quedaban invisibles.
+          console.log(
+            `⚠️  WhatsApp desconectado (status ${status ?? '—'} · ${reason})` +
+              (detail ? `: ${detail}` : ''),
+          );
+
           if (loggedOut) {
             // La sesión ya no sirve: hay que volver a escanear el QR.
+            this.reconnectAttempts = 0;
             this.setState('apagado', {
               qr: null,
               error: 'La sesión se cerró desde el celular. Volvé a vincular el número.',
@@ -129,8 +165,27 @@ export class BaileysChannel implements MessagingChannel {
             return;
           }
 
-          // Caída transitoria: Baileys reconecta reusando las credenciales.
-          console.log('⚠️  WhatsApp desconectado, reconectando…');
+          // Caída transitoria: Baileys reconecta reusando las credenciales,
+          // pero con tope. Si WhatsApp rechaza el handshake (p.ej. 405), esto
+          // evita el loop infinito silencioso y muestra el error en el panel.
+          if (this.reconnectAttempts >= BaileysChannel.MAX_RECONNECTS) {
+            this.reconnectAttempts = 0;
+            this.setState('error', {
+              qr: null,
+              error:
+                `No se pudo conectar con WhatsApp tras varios intentos ` +
+                `(status ${status ?? '—'} · ${reason})` +
+                (detail ? `: ${detail}` : '') +
+                `. Probá "Limpiar sesión" y volvé a vincular; si persiste, ` +
+                `revisá los logs del backend.`,
+            });
+            return;
+          }
+
+          this.reconnectAttempts += 1;
+          console.log(
+            `   reconectando… (intento ${this.reconnectAttempts}/${BaileysChannel.MAX_RECONNECTS})`,
+          );
           this.setState('iniciando', { qr: null });
           void this.connect().catch((err) => {
             this.setState('error', { error: err instanceof Error ? err.message : String(err) });
