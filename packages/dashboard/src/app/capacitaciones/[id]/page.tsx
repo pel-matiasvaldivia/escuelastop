@@ -9,7 +9,7 @@ import {
 } from '../../../lib/api';
 
 /**
- * Detalle de una comisión: matrícula de alumnos y, por alumno, el ciclo completo
+ * Detalle de un curso: matrícula de alumnos y, por alumno, el ciclo completo
  * de evaluación — examen teórico (habilitar / validar), evaluación práctica
  * (rúbrica) y emisión del certificado.
  */
@@ -25,7 +25,7 @@ const DEFAULT_RUBRICA = [
   'Conducción defensiva y distancia de seguimiento',
 ];
 
-export default function ComisionDetalle() {
+export default function CursoDetalle() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -56,7 +56,7 @@ export default function ComisionDetalle() {
         await reload();
       } catch (err) {
         if (err instanceof UnauthorizedError) return router.replace('/login');
-        setError('No se pudo cargar la comisión.');
+        setError('No se pudo cargar el curso.');
       } finally {
         setLoading(false);
       }
@@ -84,19 +84,19 @@ export default function ComisionDetalle() {
     }
   }
 
-  async function cerrarComision() {
-    if (!window.confirm('¿Cerrar la comisión? Se marca como finalizada.')) return;
+  async function cerrarCurso() {
+    if (!window.confirm('¿Cerrar el curso? Se marca como finalizado.')) return;
     try {
       await api.updateTrainingCourse(id, { estado: 'cerrado' });
       await reload();
-      flash('Comisión cerrada.');
+      flash('Curso cerrado.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cerrar');
     }
   }
 
   if (loading) return <p style={{ color: '#64748b' }}>Cargando…</p>;
-  if (!course) return <p style={{ color: '#b91c1c' }}>Comisión no encontrada.</p>;
+  if (!course) return <p style={{ color: '#b91c1c' }}>Curso no encontrado.</p>;
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
@@ -106,14 +106,25 @@ export default function ComisionDetalle() {
 
       <section style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: '0 0 6px' }}>{course.nombre}</h2>
+          <h2 style={{ margin: '0 0 6px' }}>
+            {course.nombre}
+            {course.banco_categoria && (
+              <span style={{
+                marginLeft: 10, padding: '3px 10px', borderRadius: 10, fontSize: 13,
+                fontWeight: 600, background: '#e0e7ff', color: '#3730a3', verticalAlign: 'middle',
+              }}>
+                Curso {course.banco_categoria}
+              </span>
+            )}
+          </h2>
           <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>
             {course.sede ?? 'Sin sucursal'} · Instructor: {course.instructor_email ?? '—'} ·
-            Banco: {course.banco_categoria ?? 'sin examen'} · Estado: {course.estado.replace('_', ' ')}
+            Examen: {course.plantilla_nombre ?? course.banco_categoria ?? 'sin examen'} ·
+            Estado: {course.estado.replace('_', ' ')}
           </p>
         </div>
         {course.estado !== 'cerrado' && (
-          <button onClick={cerrarComision} style={secondaryBtn}>Cerrar comisión</button>
+          <button onClick={cerrarCurso} style={secondaryBtn}>Cerrar curso</button>
         )}
       </section>
 

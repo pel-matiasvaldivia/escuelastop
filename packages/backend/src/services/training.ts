@@ -2,11 +2,11 @@ import { randomInt } from 'node:crypto';
 import { query } from '../db/index.js';
 
 /**
- * Capacitación de la Fase 2: comisiones (cohortes) y sus alumnos.
+ * Capacitación de la Fase 2: cursos (cohortes) y sus alumnos.
  *
- * Una COMISIÓN (training_courses) es una instancia concreta de un curso, en una
+ * Un CURSO (training_courses) es una instancia concreta de capacitación, en una
  * sucursal, a cargo de un instructor y con el banco de examen que le corresponde.
- * Los ALUMNOS (course_students) se matriculan a la comisión — desde una
+ * Los ALUMNOS (course_students) se matriculan al curso — desde una
  * inscripción de la Fase 1 o cargados a mano — y cada uno recibe un código único
  * con el que inicia el examen en la tablet.
  */
@@ -18,6 +18,7 @@ export interface TrainingCourse {
   nombre: string;
   course_id: string | null;
   bank_id: string | null;
+  template_id: string | null;
   sede: string | null;
   instructor_id: string | null;
   fecha_inicio: string | null;
@@ -28,10 +29,11 @@ export interface TrainingCourse {
   updated_at: string;
 }
 
-/** Comisión con datos derivados para el listado del panel. */
+/** Curso con datos derivados para el listado del panel. */
 export interface TrainingCourseView extends TrainingCourse {
   instructor_email: string | null;
   banco_categoria: string | null;
+  plantilla_nombre: string | null;
   alumnos: number;
 }
 
@@ -55,7 +57,7 @@ export interface CourseStudent {
   updated_at: string;
 }
 
-// ------------------------------ Comisiones ---------------------------------
+// ------------------------------ Cursos ---------------------------------
 
 /** Genera un código corto legible para el alumno (evita 0/O y 1/I). */
 function generarCodigo(): string {
@@ -66,7 +68,7 @@ function generarCodigo(): string {
 }
 
 /**
- * Lista comisiones para el panel. `sucursal` aplica el scoping de operadores
+ * Lista cursos para el panel. `sucursal` aplica el scoping de operadores
  * (solo ven las de su sede); el admin no pasa filtro y ve todas.
  */
 export async function listTrainingCourses(
@@ -81,14 +83,17 @@ export async function listTrainingCourses(
   const res = await query<TrainingCourseView & { alumnos: string }>(
     `SELECT tc.*,
             u.email      AS instructor_email,
-            b.categoria  AS banco_categoria,
+            COALESCE(b.categoria, tb.categoria) AS banco_categoria,
+            t.nombre     AS plantilla_nombre,
             COUNT(cs.id) AS alumnos
        FROM training_courses tc
        LEFT JOIN admin_users u    ON u.id = tc.instructor_id
        LEFT JOIN exam_banks  b    ON b.id = tc.bank_id
+       LEFT JOIN exam_templates t ON t.id = tc.template_id
+       LEFT JOIN exam_banks  tb   ON tb.id = t.bank_id
        LEFT JOIN course_students cs ON cs.training_course_id = tc.id
        ${where}
-      GROUP BY tc.id, u.email, b.categoria
+      GROUP BY tc.id, u.email, b.categoria, tb.categoria, t.nombre
       ORDER BY tc.created_at DESC`,
     values,
   );
@@ -100,10 +105,33 @@ export async function getTrainingCourse(id: string): Promise<TrainingCourse | nu
   return res.rows[0] ?? null;
 }
 
+/** Curso con datos derivados (instructor, categoría, plantilla) para el detalle. */
+export async function getTrainingCourseView(id: string): Promise<TrainingCourseView | null> {
+  const res = await query<TrainingCourseView & { alumnos: string }>(
+    `SELECT tc.*,
+            u.email      AS instructor_email,
+            COALESCE(b.categoria, tb.categoria) AS banco_categoria,
+            t.nombre     AS plantilla_nombre,
+            COUNT(cs.id) AS alumnos
+       FROM training_courses tc
+       LEFT JOIN admin_users u    ON u.id = tc.instructor_id
+       LEFT JOIN exam_banks  b    ON b.id = tc.bank_id
+       LEFT JOIN exam_templates t ON t.id = tc.template_id
+       LEFT JOIN exam_banks  tb   ON tb.id = t.bank_id
+       LEFT JOIN course_students cs ON cs.training_course_id = tc.id
+      WHERE tc.id = $1
+      GROUP BY tc.id, u.email, b.categoria, tb.categoria, t.nombre`,
+    [id],
+  );
+  const row = res.rows[0];
+  return row ? { ...row, alumnos: Number(row.alumnos) } : null;
+}
+
 export async function createTrainingCourse(input: {
   nombre: string;
   courseId?: string | null;
   bankId?: string | null;
+  templateId?: string | null;
   sede?: string | null;
   instructorId?: string | null;
   fechaInicio?: string | null;
@@ -112,12 +140,12 @@ export async function createTrainingCourse(input: {
 }): Promise<TrainingCourse> {
   const res = await query<TrainingCourse>(
     `INSERT INTO training_courses
-       (nombre, course_id, bank_id, sede, instructor_id, fecha_inicio, fecha_fin, notas)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+       (nombre, course_id, bank_id, template_id, sede, instructor_id, fecha_inicio, fecha_fin, notas)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
     [
-      input.nombre, input.courseId ?? null, input.bankId ?? null, input.sede ?? null,
-      input.instructorId ?? null, input.fechaInicio ?? null, input.fechaFin ?? null,
-      input.notas ?? null,
+      input.nombre, input.courseId ?? null, input.bankId ?? null, input.templateId ?? null,
+      input.sede ?? null, input.instructorId ?? null, input.fechaInicio ?? null,
+      input.fechaFin ?? null, input.notas ?? null,
     ],
   );
   return res.rows[0];
@@ -126,13 +154,13 @@ export async function createTrainingCourse(input: {
 export async function updateTrainingCourse(
   id: string,
   fields: Partial<{
-    nombre: string; bank_id: string | null; sede: string | null;
+    nombre: string; bank_id: string | null; template_id: string | null; sede: string | null;
     instructor_id: string | null; fecha_inicio: string | null; fecha_fin: string | null;
     estado: TrainingEstado; notas: string | null;
   }>,
 ): Promise<TrainingCourse | null> {
   const allowed: (keyof typeof fields)[] = [
-    'nombre', 'bank_id', 'sede', 'instructor_id', 'fecha_inicio', 'fecha_fin', 'estado', 'notas',
+    'nombre', 'bank_id', 'template_id', 'sede', 'instructor_id', 'fecha_inicio', 'fecha_fin', 'estado', 'notas',
   ];
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -152,7 +180,7 @@ export async function updateTrainingCourse(
   return res.rows[0] ?? null;
 }
 
-/** ¿Esta comisión pertenece a esta sucursal? (autorización de operadores). */
+/** ¿Este curso pertenece a esta sucursal? (autorización de operadores). */
 export async function trainingInSucursal(id: string, sucursal: string): Promise<boolean> {
   const res = await query<{ ok: boolean }>(
     'SELECT TRUE AS ok FROM training_courses WHERE id = $1 AND sede = $2',
@@ -176,7 +204,7 @@ export async function getStudent(id: string): Promise<CourseStudent | null> {
   return res.rows[0] ?? null;
 }
 
-/** Sucursal de la comisión de un alumno (para el scoping de operadores). */
+/** Sucursal del curso de un alumno (para el scoping de operadores). */
 export async function studentSucursal(id: string): Promise<string | null | undefined> {
   const res = await query<{ sede: string | null }>(
     `SELECT tc.sede FROM course_students cs
@@ -187,7 +215,7 @@ export async function studentSucursal(id: string): Promise<string | null | undef
   return res.rows.length ? res.rows[0].sede : undefined;
 }
 
-/** Matricula un alumno en una comisión. Genera un código único (reintenta ante colisión). */
+/** Matricula un alumno en un curso. Genera un código único (reintenta ante colisión). */
 export async function addStudent(input: {
   trainingCourseId: string;
   fullName: string;
@@ -212,7 +240,7 @@ export async function addStudent(input: {
       // 23505 = unique_violation. Puede ser el DNI (alumno repetido) o el código.
       if (code === '23505') {
         const detail = String((err as { detail?: string }).detail ?? '');
-        if (detail.includes('dni')) return { error: 'Ese DNI ya está matriculado en la comisión' };
+        if (detail.includes('dni')) return { error: 'Ese DNI ya está matriculado en el curso' };
         continue; // colisión de código: reintenta
       }
       throw err;

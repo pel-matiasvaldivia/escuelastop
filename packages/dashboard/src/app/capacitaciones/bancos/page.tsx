@@ -5,35 +5,37 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   api, auth, UnauthorizedError,
-  type ExamBank, type ExamQuestion, type ExamCategory,
+  type ExamBank, type ExamQuestion, type ExamCategory, type ExamTemplate,
 } from '../../../lib/api';
 
 /**
- * Gestor de BANCOS de preguntas (solo admin). Cada banco corresponde a un tipo
- * de licencia y tiene su propio set de preguntas. Acá la escuela carga (o revisa)
- * las preguntas reales que después toman los alumnos en el examen.
+ * Gestor de CATEGORÍAS de preguntas y PLANTILLAS de examen (instructor o admin).
+ * Una categoría es el pool de preguntas de un tipo de licencia; una plantilla
+ * toma una categoría y fija los parámetros del examen (cantidad, nota, tiempo).
  */
 export default function BancosPage() {
   const router = useRouter();
   const [banks, setBanks] = useState<ExamBank[]>([]);
+  const [templates, setTemplates] = useState<ExamTemplate[]>([]);
   const [cats, setCats] = useState<ExamCategory[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Alta de banco.
+  // Alta de categoría (banco).
   const [categoria, setCategoria] = useState('');
   const [nombre, setNombre] = useState('');
-  const [notaMinima, setNotaMinima] = useState(70);
-  const [preguntasPorExamen, setPreguntasPorExamen] = useState(10);
 
   async function reload() {
-    setBanks(await api.examBanks());
+    const [b, t] = await Promise.all([api.examBanks(), api.examTemplates()]);
+    setBanks(b);
+    setTemplates(t);
   }
 
   useEffect(() => {
     if (!auth.isAuthenticated()) return void router.replace('/login');
-    if (!auth.isAdmin()) return void router.replace('/capacitaciones');
+    const role = auth.getUser()?.role;
+    if (role !== 'admin' && role !== 'instructor') return void router.replace('/capacitaciones');
     (async () => {
       try {
         await reload();
@@ -42,7 +44,7 @@ export default function BancosPage() {
         if (c[0]) { setCategoria(c[0].key); setNombre(c[0].nombre); }
       } catch (err) {
         if (err instanceof UnauthorizedError) return router.replace('/login');
-        setError('No se pudieron cargar los bancos.');
+        setError('No se pudieron cargar las categorías.');
       } finally {
         setLoading(false);
       }
@@ -54,10 +56,10 @@ export default function BancosPage() {
     e.preventDefault();
     setError(null);
     try {
-      await api.createBank({ categoria, nombre, notaMinima, preguntasPorExamen });
+      await api.createBank({ categoria, nombre });
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear el banco');
+      setError(err instanceof Error ? err.message : 'No se pudo crear la categoría');
     }
   }
 
@@ -66,11 +68,18 @@ export default function BancosPage() {
   return (
     <div style={{ display: 'grid', gap: 24 }}>
       <div><Link href="/capacitaciones" style={{ color: '#2563eb', fontSize: 14 }}>← Capacitaciones</Link></div>
-      <h2 style={{ margin: 0 }}>Bancos de preguntas</h2>
+      <h2 style={{ margin: 0 }}>Categorías de preguntas y plantillas de examen</h2>
       {error && <div style={errorStyle}>{error}</div>}
 
+      <TemplatesSection banks={banks} templates={templates} onChange={reload} />
+
       <section style={cardStyle}>
-        <h3 style={{ margin: '0 0 12px' }}>Nuevo banco</h3>
+        <h3 style={{ margin: '0 0 4px' }}>Categorías de preguntas</h3>
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#64748b' }}>
+          Una categoría agrupa las preguntas de un tipo de licencia. Cargá las preguntas
+          (manual o por Excel/CSV) y después armá una plantilla que las use.
+        </p>
+        <h4 style={{ margin: '0 0 10px' }}>Nueva categoría</h4>
         <form onSubmit={createBank} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <label style={fieldStyle}>
             <span style={labelStyle}>Categoría</span>
@@ -87,27 +96,17 @@ export default function BancosPage() {
             </select>
           </label>
           <label style={fieldStyle}>
-            <span style={labelStyle}>Nombre</span>
+            <span style={labelStyle}>Nombre visible</span>
             <input value={nombre} onChange={(e) => setNombre(e.target.value)} style={inputStyle} />
-          </label>
-          <label style={{ ...fieldStyle, flex: '0 0 120px' }}>
-            <span style={labelStyle}>Nota mín. %</span>
-            <input type="number" value={notaMinima} onChange={(e) => setNotaMinima(Number(e.target.value))} style={inputStyle} />
-          </label>
-          <label style={{ ...fieldStyle, flex: '0 0 120px' }}>
-            <span style={labelStyle}>Preg./examen</span>
-            <input type="number" value={preguntasPorExamen} onChange={(e) => setPreguntasPorExamen(Number(e.target.value))} style={inputStyle} />
           </label>
           <button type="submit" style={primaryBtn}>+ Crear / actualizar</button>
         </form>
-      </section>
 
-      <section>
-        <table style={tableStyle}>
+        <table style={{ ...tableStyle, marginTop: 16 }}>
           <thead>
             <tr>
               <th style={th}>Categoría</th><th style={th}>Nombre</th>
-              <th style={th}>Preguntas</th><th style={th}>Nota mín.</th><th style={th}></th>
+              <th style={th}>Preguntas</th><th style={th}></th>
             </tr>
           </thead>
           <tbody>
@@ -116,7 +115,6 @@ export default function BancosPage() {
                 <td style={td}><strong>{b.categoria}</strong></td>
                 <td style={td}>{b.nombre}</td>
                 <td style={td}>{b.preguntas}</td>
-                <td style={td}>{b.nota_minima}%</td>
                 <td style={{ ...td, textAlign: 'right' }}>
                   <button onClick={() => setSelected(selected === b.id ? null : b.id)} style={linkBtn}>
                     {selected === b.id ? 'Cerrar' : 'Preguntas'}
@@ -124,13 +122,115 @@ export default function BancosPage() {
                 </td>
               </tr>
             ))}
-            {banks.length === 0 && <tr><td style={td} colSpan={5}>Sin bancos.</td></tr>}
+            {banks.length === 0 && <tr><td style={td} colSpan={4}>Sin categorías todavía.</td></tr>}
           </tbody>
         </table>
       </section>
 
       {selected && <QuestionManager key={selected} bankId={selected} onCount={reload} />}
     </div>
+  );
+}
+
+/** Sección de plantillas de examen: crear (elige categoría + parámetros) y listar. */
+function TemplatesSection({
+  banks, templates, onChange,
+}: {
+  banks: ExamBank[];
+  templates: ExamTemplate[];
+  onChange: () => Promise<void>;
+}) {
+  const [nombre, setNombre] = useState('');
+  const [bankId, setBankId] = useState('');
+  const [preguntasPorExamen, setPreguntas] = useState(10);
+  const [notaMinima, setNota] = useState(70);
+  const [tiempoLimiteMin, setTiempo] = useState(30);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!bankId && banks[0]) setBankId(banks[0].id);
+  }, [banks, bankId]);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!bankId) { setError('Primero creá una categoría de preguntas.'); return; }
+    try {
+      await api.createTemplate({ nombre: nombre.trim(), bankId, preguntasPorExamen, notaMinima, tiempoLimiteMin });
+      setNombre('');
+      await onChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la plantilla');
+    }
+  }
+
+  async function remove(id: string) {
+    if (!window.confirm('¿Eliminar la plantilla? Los cursos que la usaban quedan sin examen asignado.')) return;
+    await api.deleteTemplate(id);
+    await onChange();
+  }
+
+  return (
+    <section style={cardStyle}>
+      <h3 style={{ margin: '0 0 4px' }}>Plantillas de examen</h3>
+      <p style={{ margin: '0 0 12px', fontSize: 13, color: '#64748b' }}>
+        Una plantilla toma una categoría de preguntas y define cómo se arma el examen.
+        El curso elige una plantilla.
+      </p>
+      {error && <div style={{ ...errorStyle, marginBottom: 12 }}>{error}</div>}
+
+      <form onSubmit={create} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <label style={{ ...fieldStyle, flex: '1 1 220px' }}>
+          <span style={labelStyle}>Nombre de la plantilla</span>
+          <input required value={nombre} onChange={(e) => setNombre(e.target.value)}
+            placeholder="Ej: B1 — examen final" style={inputStyle} />
+        </label>
+        <label style={{ ...fieldStyle, flex: '1 1 220px' }}>
+          <span style={labelStyle}>Categoría de preguntas</span>
+          <select value={bankId} onChange={(e) => setBankId(e.target.value)} style={inputStyle}>
+            {banks.length === 0 && <option value="">— Creá una categoría primero —</option>}
+            {banks.map((b) => <option key={b.id} value={b.id}>{b.categoria} · {b.nombre} ({b.preguntas} preg.)</option>)}
+          </select>
+        </label>
+        <label style={{ ...fieldStyle, flex: '0 0 110px' }}>
+          <span style={labelStyle}>Preg./examen</span>
+          <input type="number" min={1} value={preguntasPorExamen} onChange={(e) => setPreguntas(Number(e.target.value))} style={inputStyle} />
+        </label>
+        <label style={{ ...fieldStyle, flex: '0 0 100px' }}>
+          <span style={labelStyle}>Nota mín. %</span>
+          <input type="number" min={0} max={100} value={notaMinima} onChange={(e) => setNota(Number(e.target.value))} style={inputStyle} />
+        </label>
+        <label style={{ ...fieldStyle, flex: '0 0 100px' }}>
+          <span style={labelStyle}>Tiempo (min)</span>
+          <input type="number" min={1} value={tiempoLimiteMin} onChange={(e) => setTiempo(Number(e.target.value))} style={inputStyle} />
+        </label>
+        <button type="submit" style={primaryBtn}>+ Crear plantilla</button>
+      </form>
+
+      <table style={{ ...tableStyle, marginTop: 16 }}>
+        <thead>
+          <tr>
+            <th style={th}>Plantilla</th><th style={th}>Categoría</th>
+            <th style={th}>Preg.</th><th style={th}>Nota</th><th style={th}>Tiempo</th><th style={th}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {templates.map((t) => (
+            <tr key={t.id}>
+              <td style={td}><strong>{t.nombre}</strong></td>
+              <td style={td}>{t.categoria ?? '—'}</td>
+              <td style={td}>{t.preguntas_por_examen}</td>
+              <td style={td}>{t.nota_minima}%</td>
+              <td style={td}>{t.tiempo_limite_min}′</td>
+              <td style={{ ...td, textAlign: 'right' }}>
+                <button onClick={() => remove(t.id)} style={{ ...linkBtn, color: '#dc2626' }}>Eliminar</button>
+              </td>
+            </tr>
+          ))}
+          {templates.length === 0 && <tr><td style={td} colSpan={6}>Sin plantillas todavía.</td></tr>}
+        </tbody>
+      </table>
+    </section>
   );
 }
 
