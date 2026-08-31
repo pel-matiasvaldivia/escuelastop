@@ -128,6 +128,19 @@ ALTER TABLE training_courses
 ALTER TABLE exam_sessions
   ADD COLUMN IF NOT EXISTS nota_minima INT;
 
+-- Cupo de asientos por curso y baja de alumnos (para bases ya creadas).
+ALTER TABLE training_courses
+  ADD COLUMN IF NOT EXISTS cupo_maximo INT;
+ALTER TABLE course_students
+  ADD COLUMN IF NOT EXISTS baja_motivo TEXT;
+ALTER TABLE course_students
+  ADD COLUMN IF NOT EXISTS baja_at TIMESTAMPTZ;
+-- Estado 'baja' para el alumno que abandona o se da de baja (conserva historial).
+ALTER TABLE course_students DROP CONSTRAINT IF EXISTS course_students_estado_check;
+ALTER TABLE course_students
+  ADD CONSTRAINT course_students_estado_check
+  CHECK (estado IN ('cursando','teoria_aprobada','teoria_desaprobada','aprobado','desaprobado','baja'));
+
 -- ===========================================================================
 -- FASE 2 — Capacitación, evaluación teórica/práctica y certificación.
 --
@@ -197,6 +210,7 @@ CREATE TABLE IF NOT EXISTS training_courses (
   template_id   UUID REFERENCES exam_templates(id) ON DELETE SET NULL, -- plantilla de examen
   sede          TEXT,
   instructor_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  cupo_maximo   INT,                          -- asientos; NULL = sin límite
   fecha_inicio  DATE,
   fecha_fin     DATE,
   estado        TEXT NOT NULL DEFAULT 'abierto'
@@ -220,7 +234,9 @@ CREATE TABLE IF NOT EXISTS course_students (
   codigo             TEXT NOT NULL,           -- código único para iniciar el examen
   estado             TEXT NOT NULL DEFAULT 'cursando'
                      CHECK (estado IN ('cursando','teoria_aprobada','teoria_desaprobada',
-                                       'aprobado','desaprobado')),
+                                       'aprobado','desaprobado','baja')),
+  baja_motivo        TEXT,                    -- por qué se dio de baja (abandono, etc.)
+  baja_at            TIMESTAMPTZ,             -- cuándo se dio de baja
   practica_aprobada  BOOLEAN,                 -- NULL = sin evaluar aún
   practica_rubrica   JSONB,                   -- items evaluados (habilidades/maniobras)
   practica_por       TEXT,
@@ -266,3 +282,27 @@ CREATE TABLE IF NOT EXISTS certificates (
   anulado           BOOLEAN NOT NULL DEFAULT FALSE
 );
 CREATE INDEX IF NOT EXISTS idx_certificates_student ON certificates(course_student_id);
+
+-- Clases dictadas de un curso (una fila por fecha de clase). Sirven para tomar
+-- asistencia: cada clase tiene su registro de presentes/ausentes por alumno.
+CREATE TABLE IF NOT EXISTS course_classes (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  training_course_id UUID NOT NULL REFERENCES training_courses(id) ON DELETE CASCADE,
+  fecha              DATE NOT NULL,
+  tema               TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_course_classes_course ON course_classes(training_course_id);
+
+-- Asistencia por alumno en cada clase. presente = TRUE/FALSE.
+CREATE TABLE IF NOT EXISTS class_attendance (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id          UUID NOT NULL REFERENCES course_classes(id) ON DELETE CASCADE,
+  course_student_id UUID NOT NULL REFERENCES course_students(id) ON DELETE CASCADE,
+  presente          BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (class_id, course_student_id)
+);
+CREATE INDEX IF NOT EXISTS idx_class_attendance_class ON class_attendance(class_id);
+CREATE INDEX IF NOT EXISTS idx_class_attendance_student ON class_attendance(course_student_id);

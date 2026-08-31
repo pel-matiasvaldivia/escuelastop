@@ -8,7 +8,9 @@ import { listInstructores } from '../services/auth.js';
 import {
   listTrainingCourses, getTrainingCourse, getTrainingCourseView, createTrainingCourse,
   updateTrainingCourse, trainingInSucursal, listStudents, getStudent, studentSucursal, addStudent,
-  findStudentByCodigo, removeStudent, setStudentTeoria, setPractica, cerrarAlumno,
+  findStudentByCodigo, removeStudent, darDeBaja, reactivarStudent, setStudentTeoria, setPractica,
+  cerrarAlumno, listClasses, createClass, deleteClass, classCourseId, getAttendance, setAttendance,
+  attendanceSummary,
 } from '../services/training.js';
 import {
   listBanks, getBank, upsertBank, listQuestions, addQuestion, addQuestionsBulk,
@@ -207,7 +209,7 @@ export function makeFase2Router(): Router {
   });
 
   router.post('/training-courses', requireAuth, async (req, res) => {
-    const { nombre, courseId, bankId, templateId, sede, instructorId, fechaInicio, fechaFin, notas } =
+    const { nombre, courseId, bankId, templateId, sede, instructorId, cupoMaximo, fechaInicio, fechaFin, notas } =
       req.body as Record<string, unknown>;
     if (typeof nombre !== 'string' || !nombre.trim()) {
       res.status(400).json({ error: 'El nombre del curso es requerido' });
@@ -235,6 +237,7 @@ export function makeFase2Router(): Router {
       templateId: typeof templateId === 'string' && templateId ? templateId : null,
       sede: sedeFinal ?? null,
       instructorId: typeof instructorId === 'string' && instructorId ? instructorId : null,
+      cupoMaximo: Number.isFinite(Number(cupoMaximo)) && Number(cupoMaximo) > 0 ? Number(cupoMaximo) : null,
       fechaInicio: typeof fechaInicio === 'string' && fechaInicio ? fechaInicio : null,
       fechaFin: typeof fechaFin === 'string' && fechaFin ? fechaFin : null,
       notas: typeof notas === 'string' ? notas : null,
@@ -263,6 +266,11 @@ export function makeFase2Router(): Router {
       res.status(400).json({ error: 'La sucursal no está operativa' });
       return;
     }
+    // Cupo: número positivo o null (sin límite).
+    if ('cupo_maximo' in body) {
+      const n = Number(body.cupo_maximo);
+      body.cupo_maximo = Number.isFinite(n) && n > 0 ? n : null;
+    }
     const updated = await updateTrainingCourse(req.params.id, body);
     res.json(updated);
   });
@@ -282,13 +290,43 @@ export function makeFase2Router(): Router {
       enrollmentId: enrollmentId || null, contactId: contactId || null,
     });
     if ('error' in result) {
-      res.status(400).json(result);
+      // 409 si es por cupo lleno; 400 para el resto (DNI repetido, etc.).
+      res.status(result.error.includes('completo') ? 409 : 400).json(result);
       return;
     }
     res.status(201).json(result);
   });
 
-  router.delete('/students/:id', requireAuth, async (req, res) => {
+  // Baja del alumno (abandono / se dio de baja). NO borra: conserva el historial
+  // y libera el asiento. Reversible con /reactivar.
+  router.post('/students/:id/baja', requireAuth, async (req, res) => {
+    if (!(await ensureStudentAccess(req, res, req.params.id))) return;
+    const { motivo } = req.body as { motivo?: string };
+    const updated = await darDeBaja(req.params.id, motivo);
+    if (!updated) {
+      res.status(404).json({ error: 'Alumno no encontrado' });
+      return;
+    }
+    res.json(updated);
+  });
+
+  // Reactiva a un alumno dado de baja (vuelve a ocupar asiento).
+  router.post('/students/:id/reactivar', requireAuth, async (req, res) => {
+    if (!(await ensureStudentAccess(req, res, req.params.id))) return;
+    const result = await reactivarStudent(req.params.id);
+    if (!result) {
+      res.status(404).json({ error: 'Alumno no encontrado' });
+      return;
+    }
+    if ('error' in result) {
+      res.status(409).json(result);
+      return;
+    }
+    res.json(result);
+  });
+
+  // Borrado DEFINITIVO (elimina también el historial). Solo admin.
+  router.delete('/students/:id', requireAuth, requireAdmin, async (req, res) => {
     if (!(await ensureStudentAccess(req, res, req.params.id))) return;
     res.json({ ok: await removeStudent(req.params.id) });
   });
@@ -431,6 +469,55 @@ export function makeFase2Router(): Router {
     res.json({ ok: await anular(req.params.id) });
   });
 
+  // ============================ ASISTENCIA ============================
+  // Clases del curso y el registro de presentes/ausentes por alumno.
+  router.get('/training-courses/:id/classes', requireAuth, async (req, res) => {
+    if (!(await ensureTrainingAccess(req, res, req.params.id))) return;
+    res.json(await listClasses(req.params.id));
+  });
+
+  router.post('/training-courses/:id/classes', requireAuth, async (req, res) => {
+    if (!(await ensureTrainingAccess(req, res, req.params.id))) return;
+    const { fecha, tema } = req.body as { fecha?: string; tema?: string };
+    if (!fecha?.trim()) {
+      res.status(400).json({ error: 'La fecha de la clase es requerida' });
+      return;
+    }
+    res.status(201).json(await createClass(req.params.id, fecha.trim(), tema));
+  });
+
+  // Resumen de asistencia por alumno en todo el curso.
+  router.get('/training-courses/:id/attendance-summary', requireAuth, async (req, res) => {
+    if (!(await ensureTrainingAccess(req, res, req.params.id))) return;
+    res.json(await attendanceSummary(req.params.id));
+  });
+
+  router.delete('/classes/:id', requireAuth, async (req, res) => {
+    if (!(await ensureClassAccess(req, res, req.params.id))) return;
+    res.json({ ok: await deleteClass(req.params.id) });
+  });
+
+  // Asistencia registrada de una clase.
+  router.get('/classes/:id/attendance', requireAuth, async (req, res) => {
+    if (!(await ensureClassAccess(req, res, req.params.id))) return;
+    res.json(await getAttendance(req.params.id));
+  });
+
+  // Guarda la asistencia de una clase (presentes/ausentes de varios alumnos).
+  router.put('/classes/:id/attendance', requireAuth, async (req, res) => {
+    if (!(await ensureClassAccess(req, res, req.params.id))) return;
+    const { records } = req.body as { records?: { studentId?: unknown; presente?: unknown }[] };
+    if (!Array.isArray(records)) {
+      res.status(400).json({ error: 'Falta el listado de asistencia' });
+      return;
+    }
+    const clean = records
+      .filter((r) => typeof r.studentId === 'string')
+      .map((r) => ({ studentId: r.studentId as string, presente: r.presente === true }));
+    await setAttendance(req.params.id, clean);
+    res.json({ ok: true });
+  });
+
   // ============ KIOSCO DEL EXAMEN (público, tablet del alumno) ============
   // El alumno inicia con su DNI + el código único. Debe existir una sesión que el
   // instructor haya habilitado. Nunca se devuelven las respuestas correctas.
@@ -528,4 +615,14 @@ async function ensureStudentAccess(req: Request, res: Response, studentId: strin
   if (sede === scope) return true;
   res.status(403).json({ error: 'Sin acceso a este alumno' });
   return false;
+}
+
+/** Autoriza el acceso a una clase según la sede del curso al que pertenece. */
+async function ensureClassAccess(req: Request, res: Response, classId: string): Promise<boolean> {
+  const courseId = await classCourseId(classId);
+  if (!courseId) {
+    res.status(404).json({ error: 'Clase no encontrada' });
+    return false;
+  }
+  return ensureTrainingAccess(req, res, courseId);
 }

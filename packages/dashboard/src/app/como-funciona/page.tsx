@@ -56,13 +56,13 @@ const FASE1: Step[] = [
 const FASE2: Step[] = [
   {
     n: 7, accent: 'plain', title: 'Curso y matrícula',
-    desc: 'El instructor (o el admin) abre un curso — categoría, sucursal y la plantilla de examen de la categoría — y matricula a los alumnos. Cada alumno recibe un código único para rendir.',
-    chips: [{ label: 'Instructor', kind: 'who' }, { label: 'Código por alumno' }],
+    desc: 'El instructor (o el admin) abre un curso — categoría, sucursal y la plantilla de examen de la categoría — con un cupo de asientos opcional, y matricula a los alumnos hasta llenarlo. Cada alumno recibe un código único para rendir.',
+    chips: [{ label: 'Instructor', kind: 'who' }, { label: 'Cupo de asientos' }, { label: 'Código por alumno' }],
   },
   {
-    n: 8, accent: 'plain', title: 'Capacitación',
-    desc: 'Clases teóricas presenciales y prácticas en el coche escuela o en el vehículo de la categoría (auto, camión, micro, maquinaria). El material y las prácticas dependen del curso.',
-    chips: [{ label: 'Instructor + Alumno', kind: 'who' }],
+    n: 8, accent: 'plain', title: 'Capacitación y asistencia',
+    desc: 'Clases teóricas presenciales y prácticas en el coche escuela o en el vehículo de la categoría (auto, camión, micro, maquinaria). Se registra la asistencia por clase. Si un alumno abandona, se lo da de baja: conserva su historial y libera el asiento.',
+    chips: [{ label: 'Instructor + Alumno', kind: 'who' }, { label: 'Asistencia por clase' }],
   },
   {
     n: 9, accent: 'amber', title: 'Examen teórico en tablet',
