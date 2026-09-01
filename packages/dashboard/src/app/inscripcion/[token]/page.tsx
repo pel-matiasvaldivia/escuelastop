@@ -255,7 +255,15 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
 
   return (
     <div style={card}>
-      <h2>Inscripción — Escuela STOP</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 4 }}>
+        <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#ef4444,#b91c1c)', boxShadow: '0 4px 12px -3px rgba(239,68,68,.5)' }} aria-hidden>
+          <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#fff', boxShadow: 'inset 0 0 0 3px #b91c1c' }} />
+        </span>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.01em' }}>Escuela de Manejo STOP</div>
+          <div style={{ color: 'var(--muted)', fontSize: 13 }}>Formulario de inscripción</div>
+        </div>
+      </div>
       <Stepper step={step} requiresPayment={requiresPayment} />
 
       {/* Selección de curso (siempre visible en el paso de datos) */}
@@ -588,23 +596,40 @@ function Stepper({ step, requiresPayment }: { step: Step; requiresPayment: boole
   const order = steps.map((s) => s[0]);
   const current = order.indexOf(step === 'listo' ? order[order.length - 1] : step);
   return (
-    <div style={{ display: 'flex', gap: 8, margin: '8px 0 16px' }}>
-      {steps.map(([key, lbl], i) => (
-        <div key={key} style={{
-          flex: 1, textAlign: 'center', fontSize: 12, padding: '6px 0', borderRadius: 6,
-          background: i <= current ? '#0f172a' : '#e2e8f0',
-          color: i <= current ? '#fff' : '#64748b',
-        }}>
-          {i + 1}. {lbl}
-        </div>
-      ))}
+    <div style={{ display: 'flex', gap: 8, margin: '18px 0 20px' }}>
+      {steps.map(([key, lbl], i) => {
+        const done = i < current;
+        const active = i === current;
+        return (
+          <div key={key} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{
+              height: 5, borderRadius: 999,
+              background: i <= current ? 'var(--brand)' : 'var(--surface-3)',
+              transition: 'background .2s',
+            }} />
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
+              color: active ? 'var(--brand-600)' : done ? 'var(--text-2)' : 'var(--muted-2)',
+              fontWeight: active ? 700 : 500,
+            }}>
+              <span style={{
+                width: 18, height: 18, borderRadius: '50%', display: 'grid', placeItems: 'center',
+                fontSize: 10.5, fontWeight: 700,
+                background: i <= current ? 'var(--brand)' : 'var(--surface-3)',
+                color: i <= current ? '#fff' : 'var(--muted)',
+              }}>{done ? '✓' : i + 1}</span>
+              {lbl}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-const card: React.CSSProperties = { maxWidth: 560, margin: '24px auto', background: '#fff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0' };
-const label: React.CSSProperties = { display: 'block', fontSize: 13, color: '#475569', marginBottom: 4, fontWeight: 600 };
-const input: React.CSSProperties = { width: '100%', padding: 10, borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 };
-const note: React.CSSProperties = { background: '#fef9c3', padding: 10, borderRadius: 8, fontSize: 13 };
-const submitBtn: React.CSSProperties = { padding: '12px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, cursor: 'pointer', fontWeight: 600 };
-const cashBtn: React.CSSProperties = { padding: '12px 16px', background: '#fff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontWeight: 600 };
+const card: React.CSSProperties = { maxWidth: 580, margin: '28px auto', background: 'var(--surface)', padding: 28, borderRadius: 16, border: '1px solid var(--border)', boxShadow: 'var(--shadow)' };
+const label: React.CSSProperties = { display: 'block', fontSize: 12.5, color: 'var(--text-2)', marginBottom: 5, fontWeight: 600 };
+const input: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-strong)', fontSize: 14, fontFamily: 'inherit', color: 'var(--text)' };
+const note: React.CSSProperties = { background: 'var(--warning-bg)', border: '1px solid var(--warning-br)', color: 'var(--warning)', padding: '10px 12px', borderRadius: 10, fontSize: 13 };
+const submitBtn: React.CSSProperties = { padding: '12px 20px', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 10, fontSize: 15, cursor: 'pointer', fontWeight: 600 };
+const cashBtn: React.CSSProperties = { padding: '12px 16px', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border-strong)', borderRadius: 10, fontSize: 14, cursor: 'pointer', fontWeight: 600 };
