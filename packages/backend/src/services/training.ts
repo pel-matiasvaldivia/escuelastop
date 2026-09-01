@@ -105,6 +105,58 @@ export async function listTrainingCourses(
   return res.rows.map((r) => ({ ...r, alumnos: Number(r.alumnos), activos: Number(r.activos) }));
 }
 
+/** Opción de curso ABIERTO para que el alumno la elija en el formulario. */
+export interface OpenCourseOption {
+  id: string;
+  nombre: string;
+  sede: string | null;
+  fecha_inicio: string | null;
+  cupo_maximo: number | null;
+  activos: number;
+  /** Asientos libres; null = sin límite de cupo. */
+  asientos_libres: number | null;
+  /** true = ya no hay asientos (no se puede elegir). */
+  completo: boolean;
+}
+
+/**
+ * Cursos ABIERTOS de un tipo de catálogo (course_id) en una sucursal, con el
+ * estado del cupo. Es lo que ve el alumno en el formulario para elegir cohorte
+ * y quedar matriculado automáticamente. Los cursos completos se listan igual
+ * (marcados) para que sepa que existe pero está lleno.
+ */
+export async function listOpenCoursesForCatalog(
+  courseId: string, sede: string,
+): Promise<OpenCourseOption[]> {
+  const res = await query<{
+    id: string; nombre: string; sede: string | null; fecha_inicio: string | null;
+    cupo_maximo: number | null; activos: string;
+  }>(
+    `SELECT tc.id, tc.nombre, tc.sede, tc.fecha_inicio, tc.cupo_maximo,
+            COUNT(cs.id) FILTER (WHERE cs.estado <> 'baja') AS activos
+       FROM training_courses tc
+       LEFT JOIN course_students cs ON cs.training_course_id = tc.id
+      WHERE tc.course_id = $1 AND tc.sede = $2 AND tc.estado = 'abierto'
+      GROUP BY tc.id
+      ORDER BY tc.fecha_inicio NULLS LAST, tc.created_at`,
+    [courseId, sede],
+  );
+  return res.rows.map((r) => {
+    const activos = Number(r.activos);
+    const libres = r.cupo_maximo == null ? null : Math.max(0, r.cupo_maximo - activos);
+    return {
+      id: r.id,
+      nombre: r.nombre,
+      sede: r.sede,
+      fecha_inicio: r.fecha_inicio,
+      cupo_maximo: r.cupo_maximo,
+      activos,
+      asientos_libres: libres,
+      completo: libres !== null && libres <= 0,
+    };
+  });
+}
+
 export async function getTrainingCourse(id: string): Promise<TrainingCourse | null> {
   const res = await query<TrainingCourse>('SELECT * FROM training_courses WHERE id = $1', [id]);
   return res.rows[0] ?? null;

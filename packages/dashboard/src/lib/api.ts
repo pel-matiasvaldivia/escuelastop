@@ -37,7 +37,25 @@ export interface Enrollment {
   payment_status: 'pendiente' | 'aprobado' | 'rechazado';
   payment_amount: number | null;
   paid_at: string | null;
+  /** Cohorte en el que quedó matriculado (Fase 2), si corresponde. */
+  training_course_id?: string | null;
+  curso_nombre?: string | null;
+  curso_fecha_inicio?: string | null;
+  curso_cupo_maximo?: number | null;
+  curso_activos?: number | null;
   updated_at: string;
+}
+
+/** Curso ABIERTO que el alumno puede elegir en el formulario (con su cupo). */
+export interface OpenCourseOption {
+  id: string;
+  nombre: string;
+  sede: string | null;
+  fecha_inicio: string | null;
+  cupo_maximo: number | null;
+  activos: number;
+  asientos_libres: number | null;
+  completo: boolean;
 }
 
 export type DocumentKind = 'foto_licencia' | 'foto_dni' | 'apto_medico';
@@ -482,11 +500,27 @@ export const api = {
     );
   },
 
-  async saveSchedule(token: string, sede: string, notes: string) {
+  /** Cursos ABIERTOS de una sucursal para el tipo de curso de la inscripción. */
+  async availableCourses(token: string, sede: string) {
+    const res = await fetch(
+      `${API_URL}/api/public/enrollment/${token}/available-courses?sede=${encodeURIComponent(sede)}`,
+      { cache: 'no-store' },
+    );
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudieron cargar los cursos');
+    return res.json() as Promise<OpenCourseOption[]>;
+  },
+
+  /**
+   * Confirma la elección post-pago. Con `trainingCourseId` matricula al alumno
+   * automáticamente en ese cohorte; sin él solo guarda la sucursal/turno.
+   */
+  async saveSchedule(token: string, data: {
+    sede?: string; notes?: string; trainingCourseId?: string; fullName?: string; dni?: string;
+  }) {
     const res = await fetch(`${API_URL}/api/public/enrollment/${token}/schedule`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sede, notes }),
+      body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo guardar el turno');
     return res.json();

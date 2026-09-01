@@ -316,3 +316,14 @@ ALTER TABLE course_students DROP CONSTRAINT IF EXISTS course_students_estado_che
 ALTER TABLE course_students
   ADD CONSTRAINT course_students_estado_check
   CHECK (estado IN ('cursando','teoria_aprobada','teoria_desaprobada','aprobado','desaprobado','baja'));
+
+-- ---------------------------------------------------------------------------
+-- Matriculación automática (Fase 1 → Fase 2).
+-- Cuando el alumno paga la seña y elige un CURSO ABIERTO concreto en su sucursal,
+-- se lo matricula automáticamente en ese cohorte (course_students) y se guarda
+-- acá la referencia para que administración vea, desde la inscripción, en qué
+-- cohorte quedó y el estado del cupo.
+-- ---------------------------------------------------------------------------
+ALTER TABLE enrollments
+  ADD COLUMN IF NOT EXISTS training_course_id UUID REFERENCES training_courses(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_enrollments_training_course ON enrollments(training_course_id);

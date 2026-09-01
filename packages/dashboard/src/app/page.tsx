@@ -79,13 +79,15 @@ export default function HomePage() {
             <tr>
               <th style={th}>Curso</th>
               <th style={th}>Sede</th>
+              <th style={th}>Pago</th>
+              <th style={th}>Curso / cupo</th>
               <th style={th}>Estado</th>
               <th style={th}>Actualizado</th>
             </tr>
           </thead>
           <tbody>
             {enrollments.length === 0 && (
-              <tr><td style={td} colSpan={4}>Sin inscripciones todavía.</td></tr>
+              <tr><td style={td} colSpan={6}>Sin inscripciones todavía.</td></tr>
             )}
             {enrollments.map((e) => (
               <tr key={e.id}>
@@ -106,6 +108,8 @@ export default function HomePage() {
                     e.sede ?? '—'
                   )}
                 </td>
+                <td style={td}><PaymentCell e={e} /></td>
+                <td style={td}><CohorteCell e={e} /></td>
                 <td style={td}><StatusBadge status={e.status} /></td>
                 <td style={td}>{new Date(e.updated_at).toLocaleString('es-AR')}</td>
               </tr>
@@ -145,6 +149,50 @@ export default function HomePage() {
         </table>
       </section>
     </div>
+  );
+}
+
+/** Completud de la seña: estado + monto acreditado. */
+function PaymentCell({ e }: { e: Enrollment }) {
+  const colors: Record<string, string> = {
+    aprobado: '#16a34a', pendiente: '#ea580c', rechazado: '#dc2626',
+  };
+  return (
+    <span style={{ fontSize: 13 }}>
+      <span style={{
+        background: colors[e.payment_status] ?? '#64748b', color: '#fff',
+        padding: '2px 8px', borderRadius: 12, fontSize: 12,
+      }}>
+        {e.payment_status === 'aprobado' ? 'seña paga' : e.payment_status}
+      </span>
+      {e.payment_amount != null && (
+        <span style={{ color: '#475569', marginLeft: 6 }}>
+          ${e.payment_amount.toLocaleString('es-AR')}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Cohorte en el que quedó matriculado + estado del cupo. */
+function CohorteCell({ e }: { e: Enrollment }) {
+  if (!e.curso_nombre) return <span style={{ color: '#94a3b8' }}>—</span>;
+  const inicio = e.curso_fecha_inicio
+    ? new Date(e.curso_fecha_inicio).toLocaleDateString('es-AR')
+    : null;
+  const cupo = e.curso_cupo_maximo != null
+    ? `${e.curso_activos ?? 0}/${e.curso_cupo_maximo}`
+    : `${e.curso_activos ?? 0}`;
+  const lleno = e.curso_cupo_maximo != null && (e.curso_activos ?? 0) >= e.curso_cupo_maximo;
+  return (
+    <span style={{ fontSize: 13 }}>
+      <b>{e.curso_nombre}</b>
+      <br />
+      <span style={{ color: '#475569' }}>
+        {inicio ? `Inicia ${inicio} · ` : ''}
+        <span style={{ color: lleno ? '#dc2626' : '#16a34a' }}>cupo {cupo}</span>
+      </span>
+    </span>
   );
 }
 

@@ -22,8 +22,22 @@ export interface Enrollment {
   payment_id: string | null;
   payment_amount: number | null;
   paid_at: string | null;
+  /** Cohorte (training_courses) en el que quedó matriculado tras pagar/elegir. */
+  training_course_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Inscripción con datos del cohorte para el panel: administración ve, en la misma
+ * fila, en qué curso quedó matriculado el alumno, cuándo empieza y cómo está el
+ * cupo (asientos ocupados / máximo).
+ */
+export interface EnrollmentView extends Enrollment {
+  curso_nombre: string | null;
+  curso_fecha_inicio: string | null;
+  curso_cupo_maximo: number | null;
+  curso_activos: number | null;
 }
 
 export async function createEnrollment(
@@ -49,23 +63,52 @@ export async function createEnrollment(
  */
 export async function listEnrollments(
   opts: { status?: EnrollmentStatus; sucursal?: string | null } = {},
-): Promise<Enrollment[]> {
+): Promise<EnrollmentView[]> {
   const conds: string[] = [];
   const values: unknown[] = [];
   if (opts.status) {
     values.push(opts.status);
-    conds.push(`status = $${values.length}`);
+    conds.push(`e.status = $${values.length}`);
   }
   if (opts.sucursal !== undefined && opts.sucursal !== null) {
     values.push(opts.sucursal);
-    conds.push(`sede = $${values.length}`);
+    conds.push(`e.sede = $${values.length}`);
   }
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-  const res = await query<Enrollment>(
-    `SELECT * FROM enrollments ${where} ORDER BY updated_at DESC`,
+  const res = await query<EnrollmentView & { curso_activos: string | null }>(
+    `SELECT e.*,
+            tc.nombre       AS curso_nombre,
+            tc.fecha_inicio AS curso_fecha_inicio,
+            tc.cupo_maximo  AS curso_cupo_maximo,
+            (SELECT COUNT(*) FROM course_students cs
+              WHERE cs.training_course_id = tc.id AND cs.estado <> 'baja') AS curso_activos
+       FROM enrollments e
+       LEFT JOIN training_courses tc ON tc.id = e.training_course_id
+       ${where}
+      ORDER BY e.updated_at DESC`,
     values,
   );
-  return res.rows;
+  return res.rows.map((r) => ({
+    ...r,
+    curso_activos: r.curso_activos == null ? null : Number(r.curso_activos),
+  }));
+}
+
+/** Vincula la inscripción al cohorte en el que quedó matriculada. */
+export async function setEnrollmentTrainingCourse(
+  id: string, trainingCourseId: string, sede: string | null, notes: string | null,
+): Promise<Enrollment | null> {
+  const res = await query<Enrollment>(
+    `UPDATE enrollments
+        SET training_course_id = $2,
+            sede = COALESCE($3, sede),
+            notes = COALESCE($4, notes),
+            status = 'inscripto',
+            updated_at = now()
+      WHERE id = $1 RETURNING *`,
+    [id, trainingCourseId, sede, notes],
+  );
+  return res.rows[0] ?? null;
 }
 
 /** ¿La inscripción pertenece a esta sucursal? (autorización de operadores). */
@@ -143,6 +186,11 @@ export async function resolveLicenseReview(
 
 export async function getEnrollmentById(id: string): Promise<Enrollment | null> {
   const res = await query<Enrollment>('SELECT * FROM enrollments WHERE id = $1', [id]);
+  return res.rows[0] ?? null;
+}
+
+export async function getEnrollmentByPaymentId(paymentId: string): Promise<Enrollment | null> {
+  const res = await query<Enrollment>('SELECT * FROM enrollments WHERE payment_id = $1', [paymentId]);
   return res.rows[0] ?? null;
 }
 
