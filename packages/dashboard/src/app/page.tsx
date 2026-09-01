@@ -74,104 +74,138 @@ export default function HomePage() {
     }
   }
 
-  if (loading) return <p style={{ color: '#64748b' }}>Cargando…</p>;
-  if (error) return <p style={{ color: '#b91c1c' }}>{error}</p>;
+  if (loading) {
+    return (
+      <div className="empty"><span className="spinner" /> <span style={{ marginLeft: 8 }}>Cargando panel…</span></div>
+    );
+  }
+  if (error) {
+    return <div className="card card-pad" style={{ color: 'var(--danger)', borderColor: 'var(--danger-br)', background: 'var(--danger-bg)' }}>{error}</div>;
+  }
+
+  // KPIs
+  const preinscriptos = enrollments.filter((e) => e.status === 'preinscripto').length;
+  const pendientePago = enrollments.filter((e) => e.payment_status === 'aprobado' && !e.pago_completo).length;
+  const completos = enrollments.filter((e) => e.pago_completo).length;
 
   return (
-    <div style={{ display: 'grid', gap: 32 }}>
-      <section>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between',
-          alignItems: 'center', flexWrap: 'wrap', gap: 10,
-        }}>
-          <h2 style={{ margin: 0 }}>Inscripciones</h2>
-          <Link href="/inscripciones/nueva" style={{
-            padding: '9px 18px', background: '#0f172a', color: '#fff',
-            borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none',
-          }}>
-            + Nueva inscripción
-          </Link>
+    <div style={{ display: 'grid', gap: 26 }}>
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Panel</div>
+          <h1>Inscripciones</h1>
+          <div className="sub">Seguimiento del proceso de inscripción, pagos y cupos.</div>
         </div>
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={th}>Curso</th>
-              <th style={th}>Sede</th>
-              <th style={th}>Pago</th>
-              <th style={th}>Curso / cupo</th>
-              <th style={th}>Estado</th>
-              <th style={th}>Actualizado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {enrollments.length === 0 && (
-              <tr><td style={td} colSpan={6}>Sin inscripciones todavía.</td></tr>
-            )}
-            {enrollments.map((e) => (
-              <tr key={e.id}>
-                <td style={td}>{e.course ?? '—'}</td>
-                <td style={td}>
-                  {isAdmin ? (
-                    <select
-                      value={e.sede ?? ''}
-                      onChange={(ev) => reassign(e.id, ev.target.value)}
-                      style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 }}
-                    >
-                      <option value="" disabled>Sin sucursal</option>
-                      {sucursales.map((s) => (
-                        <option key={s.id} value={s.nombre}>{s.nombre}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    e.sede ?? '—'
-                  )}
-                </td>
-                <td style={td}>
-                  <PaymentCell
-                    e={e}
-                    busy={payBusyId === e.id}
-                    onComplete={() => completePay(e.id)}
-                  />
-                </td>
-                <td style={td}><CohorteCell e={e} /></td>
-                <td style={td}><StatusBadge status={e.status} /></td>
-                <td style={td}>{new Date(e.updated_at).toLocaleString('es-AR')}</td>
+        <Link href="/inscripciones/nueva" className="btn btn-primary">+ Nueva inscripción</Link>
+      </div>
+
+      <div className="stat-grid">
+        <Stat ico="📋" tint="var(--brand-050)" label="Inscripciones" value={enrollments.length} />
+        <Stat ico="🧾" tint="var(--warning-bg)" label="Pre-inscriptos" value={preinscriptos} />
+        <Stat ico="⏳" tint="var(--warning-bg)" label="Pago pendiente" value={pendientePago} />
+        <Stat ico="✅" tint="var(--success-bg)" label="Pago completo" value={completos} />
+        <Stat ico="👥" tint="var(--info-bg)" label="Leads" value={contacts.length} />
+      </div>
+
+      <section className="card">
+        <div className="card-head">
+          <h2>Bandeja de inscripciones</h2>
+          <span className="badge">{enrollments.length}</span>
+        </div>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Curso</th>
+                <th>Sede</th>
+                <th>Pago</th>
+                <th>Curso / cupo</th>
+                <th>Estado</th>
+                <th>Actualizado</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {enrollments.length === 0 && (
+                <tr><td colSpan={6}><div className="empty">Sin inscripciones todavía.</div></td></tr>
+              )}
+              {enrollments.map((e) => (
+                <tr key={e.id}>
+                  <td style={{ fontWeight: 600 }}>{e.course ?? '—'}</td>
+                  <td>
+                    {isAdmin ? (
+                      <select
+                        className="select"
+                        value={e.sede ?? ''}
+                        onChange={(ev) => reassign(e.id, ev.target.value)}
+                        style={{ padding: '6px 8px', fontSize: 13, width: 'auto', minWidth: 130 }}
+                      >
+                        <option value="" disabled>Sin sucursal</option>
+                        {sucursales.map((s) => (
+                          <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      e.sede ?? '—'
+                    )}
+                  </td>
+                  <td><PaymentCell e={e} busy={payBusyId === e.id} onComplete={() => completePay(e.id)} /></td>
+                  <td><CohorteCell e={e} /></td>
+                  <td><StatusBadge status={e.status} /></td>
+                  <td style={{ color: 'var(--muted)', whiteSpace: 'nowrap', fontSize: 13 }}>
+                    {new Date(e.updated_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <section>
-        <h2>Leads / Contactos</h2>
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={th}>Nombre</th>
-              <th style={th}>Teléfono</th>
-              <th style={th}>Interés</th>
-              <th style={th}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {contacts.length === 0 && (
-              <tr><td style={td} colSpan={4}>Sin contactos todavía.</td></tr>
-            )}
-            {contacts.map((c) => (
-              <tr key={c.id}>
-                <td style={td}>{c.full_name ?? '(sin nombre)'}</td>
-                <td style={td}>{c.phone ?? '—'}</td>
-                <td style={td}>{c.interest ?? '—'}</td>
-                <td style={td}>
-                  <Link href={`/contactos/${c.id}`} style={{ color: '#2563eb' }}>
-                    Ver conversación →
-                  </Link>
-                </td>
+      <section className="card">
+        <div className="card-head">
+          <h2>Leads / Contactos</h2>
+          <span className="badge">{contacts.length}</span>
+        </div>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Teléfono</th>
+                <th>Interés</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {contacts.length === 0 && (
+                <tr><td colSpan={4}><div className="empty">Sin contactos todavía.</div></td></tr>
+              )}
+              {contacts.map((c) => (
+                <tr key={c.id}>
+                  <td style={{ fontWeight: 600 }}>{c.full_name ?? '(sin nombre)'}</td>
+                  <td style={{ color: 'var(--text-2)' }}>{c.phone ?? '—'}</td>
+                  <td style={{ color: 'var(--text-2)' }}>{c.interest ?? '—'}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <Link href={`/contactos/${c.id}`} className="btn btn-ghost btn-sm">Ver conversación →</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
+    </div>
+  );
+}
+
+function Stat({ ico, label, value, tint }: { ico: string; label: string; value: number; tint: string }) {
+  return (
+    <div className="card stat">
+      <div className="stat-label">
+        <span className="stat-ico" style={{ background: tint }}>{ico}</span>
+        {label}
+      </div>
+      <div className="stat-value">{value}</div>
     </div>
   );
 }
@@ -180,86 +214,62 @@ export default function HomePage() {
 function PaymentCell({
   e, busy, onComplete,
 }: { e: Enrollment; busy: boolean; onComplete: () => void }) {
-  const colors: Record<string, string> = {
-    aprobado: '#16a34a', pendiente: '#ea580c', rechazado: '#dc2626',
-  };
   const senaPaga = e.payment_status === 'aprobado';
   const pagoCompleto = !!e.pago_completo;
+  const senaClass = senaPaga ? 'badge-success' : e.payment_status === 'rechazado' ? 'badge-danger' : 'badge-warning';
   return (
-    <span style={{ fontSize: 13, display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
-      <span>
-        <span style={{
-          background: colors[e.payment_status] ?? '#64748b', color: '#fff',
-          padding: '2px 8px', borderRadius: 12, fontSize: 12,
-        }}>
-          {senaPaga ? 'seña paga' : e.payment_status}
-        </span>
+    <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+        <span className={`badge ${senaClass}`}>{senaPaga ? 'seña paga' : e.payment_status}</span>
         {e.payment_amount != null && (
-          <span style={{ color: '#475569', marginLeft: 6 }}>
-            ${e.payment_amount.toLocaleString('es-AR')}
-          </span>
+          <span style={{ color: 'var(--muted)', fontSize: 13 }}>${e.payment_amount.toLocaleString('es-AR')}</span>
         )}
       </span>
       {pagoCompleto ? (
-        <span style={{ color: '#15803d', fontWeight: 600 }}>✓ Pago completo</span>
+        <span className="badge badge-success">✓ Pago completo</span>
       ) : senaPaga ? (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: '#b45309' }}>⏳ Pendiente de completar pago</span>
-          <button
-            onClick={onComplete}
-            disabled={busy}
-            style={{
-              padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6,
-              opacity: busy ? 0.6 : 1,
-            }}
-          >
-            {busy ? '…' : 'Registrar pago'}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          <span className="badge badge-warning">⏳ Falta el total</span>
+          <button onClick={onComplete} disabled={busy} className="btn btn-success btn-sm">
+            {busy ? <span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.4)' }} /> : 'Registrar pago'}
           </button>
         </span>
       ) : null}
-    </span>
+    </div>
   );
 }
 
 /** Cohorte en el que quedó matriculado + estado del cupo. */
 function CohorteCell({ e }: { e: Enrollment }) {
-  if (!e.curso_nombre) return <span style={{ color: '#94a3b8' }}>—</span>;
+  if (!e.curso_nombre) return <span style={{ color: 'var(--muted-2)' }}>—</span>;
   const inicio = e.curso_fecha_inicio
     ? new Date(e.curso_fecha_inicio).toLocaleDateString('es-AR')
     : null;
-  const cupo = e.curso_cupo_maximo != null
-    ? `${e.curso_activos ?? 0}/${e.curso_cupo_maximo}`
-    : `${e.curso_activos ?? 0}`;
+  const cupo = e.curso_cupo_maximo != null ? `${e.curso_activos ?? 0}/${e.curso_cupo_maximo}` : `${e.curso_activos ?? 0}`;
   const lleno = e.curso_cupo_maximo != null && (e.curso_activos ?? 0) >= e.curso_cupo_maximo;
   return (
     <span style={{ fontSize: 13 }}>
       <b>{e.curso_nombre}</b>
       <br />
-      <span style={{ color: '#475569' }}>
+      <span style={{ color: 'var(--muted)' }}>
         {inicio ? `Inicia ${inicio} · ` : ''}
-        <span style={{ color: lleno ? '#dc2626' : '#16a34a' }}>cupo {cupo}</span>
+        <span className={`badge ${lleno ? 'badge-danger' : 'badge-success'}`} style={{ padding: '1px 8px' }}>cupo {cupo}</span>
       </span>
     </span>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    nuevo: '#64748b', contactado: '#0891b2', inscripto: '#7c3aed',
-    pagado: '#16a34a', completado: '#15803d', cancelado: '#dc2626',
-    pendiente_verificacion: '#ea580c', preinscripto: '#d97706',
-  };
-  return (
-    <span style={{
-      background: colors[status] ?? '#64748b', color: '#fff',
-      padding: '2px 10px', borderRadius: 12, fontSize: 12,
-    }}>
-      {status}
-    </span>
-  );
-}
+const STATUS_LABEL: Record<string, string> = {
+  nuevo: 'Nuevo', contactado: 'Contactado', inscripto: 'Inscripto', pagado: 'Pagado',
+  completado: 'Completado', cancelado: 'Cancelado', pendiente_verificacion: 'Verificación',
+  preinscripto: 'Pre-inscripto',
+};
+const STATUS_CLASS: Record<string, string> = {
+  nuevo: 'badge', contactado: 'badge-info', inscripto: 'badge-violet',
+  pagado: 'badge-success', completado: 'badge-success', cancelado: 'badge-danger',
+  pendiente_verificacion: 'badge-warning', preinscripto: 'badge-warning',
+};
 
-const tableStyle = { width: '100%', borderCollapse: 'collapse' as const, background: '#fff' };
-const th = { textAlign: 'left' as const, padding: 10, borderBottom: '2px solid #e2e8f0', fontSize: 13, color: '#475569' };
-const td = { padding: 10, borderBottom: '1px solid #eef2f7', fontSize: 14 };
+function StatusBadge({ status }: { status: string }) {
+  return <span className={`badge ${STATUS_CLASS[status] ?? 'badge'}`}>{STATUS_LABEL[status] ?? status}</span>;
+}

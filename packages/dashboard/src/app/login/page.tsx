@@ -27,63 +27,55 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
-      <form
-        onSubmit={onSubmit}
-        style={{
-          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
-          padding: 28, width: '100%', maxWidth: 360, display: 'grid', gap: 14,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-        }}
-      >
-        <div>
-          <h2 style={{ margin: 0 }}>Ingresar</h2>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 14 }}>
-            Panel de administración — STOP
-          </p>
+    <div style={{ minHeight: 'calc(100vh - var(--header-h) - 92px)', display: 'grid', placeItems: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 400 }}>
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={logoMark} aria-hidden>
+            <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: 'inset 0 0 0 5px #b91c1c' }} />
+          </div>
+          <h1 style={{ margin: '14px 0 2px', fontSize: 22 }}>Escuela de Manejo STOP</h1>
+          <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14 }}>Panel de administración</p>
         </div>
 
-        <label style={labelStyle}>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoFocus
-            style={inputStyle}
-          />
-        </label>
+        <form onSubmit={onSubmit} className="card card-pad" style={{ display: 'grid', gap: 16, padding: 26, boxShadow: 'var(--shadow)' }}>
+          <div className="field">
+            <label className="label">Email</label>
+            <input
+              type="email" className="input" value={email}
+              onChange={(e) => setEmail(e.target.value)} required autoFocus
+              placeholder="admin@escuelastop.com.ar"
+            />
+          </div>
 
-        <label style={labelStyle}>
-          Contraseña
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={inputStyle}
-          />
-        </label>
+          <div className="field">
+            <label className="label">Contraseña</label>
+            <input
+              type="password" className="input" value={password}
+              onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••"
+            />
+          </div>
 
-        {error && <p style={{ color: '#b91c1c', margin: 0, fontSize: 14 }}>{error}</p>}
+          {error && (
+            <div className="badge badge-danger" style={{ justifyContent: 'flex-start', padding: '8px 12px', borderRadius: 10 }}>
+              {error}
+            </div>
+          )}
 
-        <button
-          type="submit"
-          disabled={busy}
-          style={{
-            padding: '11px 20px', background: '#0f172a', color: '#fff', border: 'none',
-            borderRadius: 8, cursor: busy ? 'default' : 'pointer', fontSize: 15, fontWeight: 600,
-          }}
-        >
-          {busy ? 'Ingresando…' : 'Ingresar'}
-        </button>
-      </form>
+          <button type="submit" disabled={busy} className="btn btn-primary btn-lg btn-block">
+            {busy ? <><span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.4)' }} /> Ingresando…</> : 'Ingresar'}
+          </button>
+        </form>
+
+        <p style={{ textAlign: 'center', color: 'var(--muted-2)', fontSize: 12, marginTop: 16 }}>
+          Acceso restringido al personal autorizado.
+        </p>
+      </div>
     </div>
   );
 }
 
-const labelStyle = { display: 'grid', gap: 6, fontSize: 14, color: '#334155' } as const;
-const inputStyle = {
-  padding: 10, borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 15,
-} as const;
+const logoMark: React.CSSProperties = {
+  width: 54, height: 54, borderRadius: 16, margin: '0 auto', display: 'grid', placeItems: 'center',
+  background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+  boxShadow: '0 10px 30px -8px rgba(239,68,68,0.5)',
+};

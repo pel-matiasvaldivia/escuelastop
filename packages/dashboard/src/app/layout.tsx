@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Header from '../components/Header';
+import './globals.css';
 
 export const metadata = {
   title: 'STOP · Administración',
@@ -9,9 +10,19 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="es">
-      <body style={{ fontFamily: 'system-ui, sans-serif', margin: 0, background: '#f5f6f8' }}>
-        <Header />
-        <main style={{ maxWidth: 1100, margin: '0 auto', padding: 24 }}>{children}</main>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>
+        <div style={{ minHeight: '100vh', background: 'var(--bg)', backgroundImage: 'var(--bg-grad)', backgroundAttachment: 'fixed' }}>
+          <Header />
+          <main className="app-main fade-in">{children}</main>
+        </div>
       </body>
     </html>
   );
