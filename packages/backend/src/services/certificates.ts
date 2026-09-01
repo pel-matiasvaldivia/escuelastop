@@ -39,9 +39,32 @@ export interface Certificate {
   anulado: boolean;
 }
 
+/**
+ * Serialización CANÓNICA de los datos con orden de campos FIJO.
+ *
+ * `datos` se guarda como JSONB y Postgres NO conserva el orden de las claves (las
+ * reordena al almacenarlas). Si firmáramos/verificáramos con `JSON.stringify` del
+ * objeto tal cual sale de la base, el orden diferiría del de emisión y el HMAC no
+ * coincidiría nunca. Reconstruyendo el objeto en un orden fijo, la firma es estable
+ * sin importar cómo el JSONB reordene las claves.
+ */
+function canonicalDatos(d: CertificateData): CertificateData {
+  return {
+    alumno: d.alumno,
+    dni: d.dni,
+    curso: d.curso,
+    categoria: d.categoria ?? null,
+    sede: d.sede ?? null,
+    nota: d.nota ?? null,
+    instructor: d.instructor ?? null,
+    fecha_curso: d.fecha_curso ?? null,
+    fecha_emision: d.fecha_emision,
+  };
+}
+
 /** Firma electrónica: HMAC-SHA256 del contenido canónico con el secreto del server. */
 function firmar(serial: string, datos: CertificateData): string {
-  const canonical = JSON.stringify({ serial, datos });
+  const canonical = JSON.stringify({ serial, datos: canonicalDatos(datos) });
   return createHmac('sha256', config.auth.jwtSecret).update(canonical).digest('hex');
 }
 
