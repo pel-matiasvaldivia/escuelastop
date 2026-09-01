@@ -22,6 +22,7 @@ export default function CapacitacionesPage() {
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
 
   // Formulario de alta.
   const [nombre, setNombre] = useState('');
@@ -86,169 +87,180 @@ export default function CapacitacionesPage() {
     }
   }
 
-  if (loading) return <p style={{ color: '#64748b' }}>Cargando…</p>;
+  if (loading) {
+    return <div className="empty"><span className="spinner" /> <span style={{ marginLeft: 8 }}>Cargando capacitaciones…</span></div>;
+  }
+
+  const abiertos = courses.filter((c) => c.estado === 'abierto').length;
+  const enCurso = courses.filter((c) => c.estado === 'en_curso').length;
+  const matriculados = courses.reduce((n, c) => n + (c.activos ?? 0), 0);
 
   return (
-    <div style={{ display: 'grid', gap: 28 }}>
-      <section>
-        <h2 style={{ margin: '0 0 4px' }}>Capacitaciones</h2>
-        <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>
-          Cursos con evaluación teórica (examen en tablet), práctica y
-          certificado con QR verificable.{' '}
-          {canManage && (
-            <Link href="/capacitaciones/bancos" style={{ color: '#2563eb' }}>
-              Categorías y plantillas de examen →
-            </Link>
-          )}
-        </p>
-      </section>
-
-      {error && <div style={errorStyle}>{error}</div>}
-
-      <section style={cardStyle}>
-        <h3 style={{ margin: '0 0 14px' }}>Nuevo curso</h3>
-        <form onSubmit={createCourse} style={{ display: 'grid', gap: 12 }}>
-          <label style={fieldStyle}>
-            <span style={labelStyle}>Nombre del curso</span>
-            <input
-              required value={nombre} onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej: B1 — Agosto (mañana)" style={inputStyle}
-            />
-          </label>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <label style={fieldStyle}>
-              <span style={labelStyle}>Plantilla de examen</span>
-              <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} style={inputStyle}>
-                <option value="">— Sin examen teórico —</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombre} · {t.categoria ?? '—'} ({t.preguntas_por_examen} preg. · {t.nota_minima}%)
-                  </option>
-                ))}
-              </select>
-            </label>
-            {isAdmin && (
-              <label style={fieldStyle}>
-                <span style={labelStyle}>Sucursal</span>
-                <select value={sede} onChange={(e) => setSede(e.target.value)} style={inputStyle}>
-                  {sucursales.map((s) => (
-                    <option key={s.id} value={s.nombre}>{s.nombre}</option>
-                  ))}
-                </select>
-              </label>
+    <div style={{ display: 'grid', gap: 26 }}>
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Fase 2</div>
+          <h1>Capacitaciones</h1>
+          <div className="sub">
+            Cursos con evaluación teórica (examen en tablet), práctica y certificado con QR.
+            {canManage && (
+              <> · <Link href="/capacitaciones/bancos">Categorías y plantillas de examen →</Link></>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {isAdmin && (
-              <label style={fieldStyle}>
-                <span style={labelStyle}>Instructor</span>
-                <select value={instructorId} onChange={(e) => setInstructorId(e.target.value)} style={inputStyle}>
-                  <option value="">— Sin asignar —</option>
-                  {instructores.map((u) => (
-                    <option key={u.id} value={u.id}>{u.email}</option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <label style={fieldStyle}>
-              <span style={labelStyle}>Cupo (asientos)</span>
+        </div>
+        {canManage && (
+          <button className="btn btn-primary" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? 'Cerrar' : '+ Nuevo curso'}
+          </button>
+        )}
+      </div>
+
+      <div className="stat-grid">
+        <Stat ico="🎓" tint="var(--brand-050)" label="Cursos" value={courses.length} />
+        <Stat ico="🟢" tint="var(--success-bg)" label="Abiertos" value={abiertos} />
+        <Stat ico="📚" tint="var(--info-bg)" label="En curso" value={enCurso} />
+        <Stat ico="👥" tint="var(--violet-bg)" label="Matriculados" value={matriculados} />
+      </div>
+
+      {error && (
+        <div className="card card-pad" style={{ color: 'var(--danger)', borderColor: 'var(--danger-br)', background: 'var(--danger-bg)' }}>
+          {error}
+        </div>
+      )}
+
+      {canManage && showForm && (
+        <section className="card fade-in">
+          <div className="card-head"><h2>Nuevo curso</h2></div>
+          <form onSubmit={createCourse} style={{ display: 'grid', gap: 14, padding: 20 }}>
+            <div className="field">
+              <span className="label">Nombre del curso</span>
               <input
-                type="number" min={1} value={cupo} onChange={(e) => setCupo(e.target.value)}
-                placeholder="Sin límite" style={inputStyle}
+                required value={nombre} onChange={(e) => setNombre(e.target.value)}
+                placeholder="Ej: B1 — Agosto (mañana)" className="input"
               />
-            </label>
-            <label style={fieldStyle}>
-              <span style={labelStyle}>Fecha de inicio</span>
-              <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} style={inputStyle} />
-            </label>
-          </div>
-          {templates.length === 0 && (
-            <p style={{ margin: 0, fontSize: 13, color: '#b45309' }}>
-              ⚠️ Todavía no hay plantillas de examen.{' '}
-              {canManage
-                ? <Link href="/capacitaciones/bancos" style={{ color: '#2563eb' }}>Creá una categoría y su plantilla →</Link>
-                : 'Pedile al instructor o admin que cree una.'}{' '}
-              Podés crear el curso igual y asignarle la plantilla después.
-            </p>
-          )}
-          <div>
-            <button type="submit" disabled={saving} style={primaryBtn}>
-              {saving ? 'Creando…' : '+ Crear curso'}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <section>
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={th}>Curso</th>
-              <th style={th}>Sucursal</th>
-              <th style={th}>Instructor</th>
-              <th style={th}>Cupo</th>
-              <th style={th}>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {courses.map((c) => (
-              <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => router.push(`/capacitaciones/${c.id}`)}>
-                <td style={td}>
-                  <strong>{c.nombre}</strong>
-                  {c.banco_categoria && (
-                    <span style={chip('#e0e7ff', '#3730a3')}>Curso {c.banco_categoria}</span>
-                  )}
-                </td>
-                <td style={td}>{c.sede ?? '—'}</td>
-                <td style={td}>{c.instructor_email ?? '—'}</td>
-                <td style={td}><Ocupacion activos={c.activos ?? 0} cupo={c.cupo_maximo} /></td>
-                <td style={td}><EstadoBadge estado={c.estado} /></td>
-              </tr>
-            ))}
-            {courses.length === 0 && (
-              <tr><td style={td} colSpan={5}>Todavía no hay cursos. Creá el primero arriba.</td></tr>
+            </div>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              <div className="field" style={{ flex: '1 1 260px' }}>
+                <span className="label">Plantilla de examen</span>
+                <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className="select">
+                  <option value="">— Sin examen teórico —</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nombre} · {t.categoria ?? '—'} ({t.preguntas_por_examen} preg. · {t.nota_minima}%)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {isAdmin && (
+                <div className="field" style={{ flex: '1 1 200px' }}>
+                  <span className="label">Sucursal</span>
+                  <select value={sede} onChange={(e) => setSede(e.target.value)} className="select">
+                    {sucursales.map((s) => (<option key={s.id} value={s.nombre}>{s.nombre}</option>))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              {isAdmin && (
+                <div className="field" style={{ flex: '1 1 240px' }}>
+                  <span className="label">Instructor</span>
+                  <select value={instructorId} onChange={(e) => setInstructorId(e.target.value)} className="select">
+                    <option value="">— Sin asignar —</option>
+                    {instructores.map((u) => (<option key={u.id} value={u.id}>{u.email}</option>))}
+                  </select>
+                </div>
+              )}
+              <div className="field" style={{ flex: '1 1 150px' }}>
+                <span className="label">Cupo (asientos)</span>
+                <input type="number" min={1} value={cupo} onChange={(e) => setCupo(e.target.value)} placeholder="Sin límite" className="input" />
+              </div>
+              <div className="field" style={{ flex: '1 1 150px' }}>
+                <span className="label">Fecha de inicio</span>
+                <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="input" />
+              </div>
+            </div>
+            {templates.length === 0 && (
+              <div className="badge badge-warning" style={{ justifyContent: 'flex-start', padding: '8px 12px', borderRadius: 10, whiteSpace: 'normal', lineHeight: 1.5 }}>
+                ⚠️ Todavía no hay plantillas de examen.{' '}
+                {canManage
+                  ? <Link href="/capacitaciones/bancos" style={{ marginLeft: 4 }}>Creá una categoría y su plantilla →</Link>
+                  : 'Pedile al instructor o admin que cree una.'}{' '}
+                Podés crear el curso igual y asignarle la plantilla después.
+              </div>
             )}
-          </tbody>
-        </table>
+            <div>
+              <button type="submit" disabled={saving} className="btn btn-primary">
+                {saving ? <><span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.4)' }} /> Creando…</> : '+ Crear curso'}
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
+
+      <section className="card">
+        <div className="card-head">
+          <h2>Cursos</h2>
+          <span className="badge">{courses.length}</span>
+        </div>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Curso</th>
+                <th>Sucursal</th>
+                <th>Instructor</th>
+                <th>Cupo</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {courses.map((c) => (
+                <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => router.push(`/capacitaciones/${c.id}`)}>
+                  <td>
+                    <strong>{c.nombre}</strong>
+                    {c.banco_categoria && (
+                      <span className="badge badge-brand" style={{ marginLeft: 8 }}>Curso {c.banco_categoria}</span>
+                    )}
+                  </td>
+                  <td style={{ color: 'var(--text-2)' }}>{c.sede ?? '—'}</td>
+                  <td style={{ color: 'var(--text-2)' }}>{c.instructor_email ?? '—'}</td>
+                  <td><Ocupacion activos={c.activos ?? 0} cupo={c.cupo_maximo} /></td>
+                  <td><EstadoBadge estado={c.estado} /></td>
+                </tr>
+              ))}
+              {courses.length === 0 && (
+                <tr><td colSpan={5}><div className="empty">Todavía no hay cursos. Creá el primero con “+ Nuevo curso”.</div></td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );
 }
 
+function Stat({ ico, label, value, tint }: { ico: string; label: string; value: number; tint: string }) {
+  return (
+    <div className="card stat">
+      <div className="stat-label"><span className="stat-ico" style={{ background: tint }}>{ico}</span>{label}</div>
+      <div className="stat-value">{value}</div>
+    </div>
+  );
+}
+
 function Ocupacion({ activos, cupo }: { activos: number; cupo: number | null }) {
-  if (cupo == null) return <span style={{ color: '#64748b' }}>{activos} · sin límite</span>;
+  if (cupo == null) return <span style={{ color: 'var(--muted)' }}>{activos} · sin límite</span>;
   const lleno = activos >= cupo;
   return (
-    <span style={{ color: lleno ? '#b91c1c' : '#0f172a', fontWeight: lleno ? 600 : 400 }}>
+    <span className={`badge ${lleno ? 'badge-danger' : 'badge-success'}`}>
       {activos} / {cupo}{lleno && ' · completo'}
     </span>
   );
 }
 
 function EstadoBadge({ estado }: { estado: string }) {
-  const map: Record<string, [string, string]> = {
-    abierto: ['#dcfce7', '#166534'],
-    en_curso: ['#dbeafe', '#1e40af'],
-    cerrado: ['#e2e8f0', '#334155'],
-    cancelado: ['#fee2e2', '#b91c1c'],
+  const cls: Record<string, string> = {
+    abierto: 'badge-success', en_curso: 'badge-info', cerrado: 'badge', cancelado: 'badge-danger',
   };
-  const [bg, fg] = map[estado] ?? ['#e2e8f0', '#334155'];
-  return <span style={chip(bg, fg)}>{estado.replace('_', ' ')}</span>;
+  return <span className={`badge ${cls[estado] ?? 'badge'}`}>{estado.replace('_', ' ')}</span>;
 }
-
-const chip = (bg: string, fg: string) => ({
-  display: 'inline-block', marginLeft: 8, padding: '2px 8px', borderRadius: 10,
-  fontSize: 11, fontWeight: 600, background: bg, color: fg,
-});
-const cardStyle = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 };
-const fieldStyle = { display: 'flex', flexDirection: 'column' as const, gap: 4, flex: '1 1 240px' };
-const labelStyle = { fontSize: 13, color: '#475569', fontWeight: 600 };
-const inputStyle = { padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, width: '100%' };
-const primaryBtn = {
-  padding: '9px 18px', background: '#0f172a', color: '#fff', border: 'none',
-  borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer',
-};
-const errorStyle = { background: '#fee2e2', color: '#b91c1c', padding: '10px 14px', borderRadius: 8, fontSize: 14 };
-const tableStyle = { width: '100%', borderCollapse: 'collapse' as const, background: '#fff' };
-const th = { textAlign: 'left' as const, padding: 10, borderBottom: '2px solid #e2e8f0', fontSize: 13, color: '#475569' };
-const td = { padding: 10, borderBottom: '1px solid #eef2f7', fontSize: 14 };

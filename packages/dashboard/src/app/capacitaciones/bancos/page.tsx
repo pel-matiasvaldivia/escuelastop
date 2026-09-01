@@ -63,12 +63,16 @@ export default function BancosPage() {
     }
   }
 
-  if (loading) return <p style={{ color: '#64748b' }}>Cargando…</p>;
+  if (loading) return <div className="empty"><span className="spinner" /> <span style={{ marginLeft: 8 }}>Cargando…</span></div>;
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
-      <div><Link href="/capacitaciones" style={{ color: '#2563eb', fontSize: 14 }}>← Capacitaciones</Link></div>
-      <h2 style={{ margin: 0 }}>Categorías de preguntas y plantillas de examen</h2>
+      <div><Link href="/capacitaciones">← Capacitaciones</Link></div>
+      <div>
+        <div className="eyebrow">Fase 2</div>
+        <h1>Categorías y plantillas de examen</h1>
+        <div className="sub">Bancos de preguntas por tipo de licencia y plantillas que definen cómo se arma cada examen.</div>
+      </div>
       {error && <div style={errorStyle}>{error}</div>}
 
       <TemplatesSection banks={banks} templates={templates} onChange={reload} />
@@ -461,13 +465,13 @@ function QuestionManager({ bankId, onCount }: { bankId: string; onCount: () => P
   );
 }
 
-const cardStyle = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 };
-const fieldStyle = { display: 'flex', flexDirection: 'column' as const, gap: 4, flex: '1 1 200px' };
-const labelStyle = { fontSize: 13, color: '#475569', fontWeight: 600 };
-const inputStyle = { padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, width: '100%' };
-const primaryBtn = { padding: '9px 16px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' };
-const linkBtn = { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: 13, padding: 0 };
-const errorStyle = { background: '#fee2e2', color: '#b91c1c', padding: '10px 14px', borderRadius: 8, fontSize: 14 };
-const tableStyle = { width: '100%', borderCollapse: 'collapse' as const, background: '#fff' };
-const th = { textAlign: 'left' as const, padding: 10, borderBottom: '2px solid #e2e8f0', fontSize: 13, color: '#475569' };
-const td = { padding: 10, borderBottom: '1px solid #eef2f7', fontSize: 14 };
+const cardStyle = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 20, boxShadow: 'var(--shadow-sm)' };
+const fieldStyle = { display: 'flex', flexDirection: 'column' as const, gap: 6, flex: '1 1 200px' };
+const labelStyle = { fontSize: 12.5, color: 'var(--text-2)', fontWeight: 600 };
+const inputStyle = { padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontSize: 14, width: '100%', fontFamily: 'inherit', color: 'var(--text)' };
+const primaryBtn = { padding: '10px 16px', background: 'var(--brand)', color: '#fff', border: '1px solid var(--brand)', borderRadius: 'var(--radius-sm)', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+const linkBtn = { background: 'none', border: 'none', color: 'var(--brand-600)', cursor: 'pointer', fontSize: 13, padding: 0, fontFamily: 'inherit', fontWeight: 600 };
+const errorStyle = { background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-br)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: 14 };
+const tableStyle = { width: '100%', borderCollapse: 'separate' as const, borderSpacing: 0, background: 'var(--surface)', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)' };
+const th = { textAlign: 'left' as const, padding: '11px 14px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', fontSize: 11.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' as const, color: 'var(--muted)' };
+const td = { padding: '12px 14px', borderBottom: '1px solid var(--border)', fontSize: 14 };
