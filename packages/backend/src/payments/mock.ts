@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import type {
-  PaymentProvider, CreatePaymentInput, CreatePaymentResult, PaymentStatus,
+  PaymentProvider, CreatePaymentInput, CreatePaymentResult, CreateTicketResult,
+  CashMethod, PaymentStatus,
 } from './provider.js';
 
 /**
@@ -24,6 +25,20 @@ export class MockPaymentProvider implements PaymentProvider {
       `${config.publicBaseUrl}/api/public/payments/mock/${paymentId}` +
       `?token=${encodeURIComponent(input.formToken)}`;
     return { paymentId, checkoutUrl };
+  }
+
+  async createTicketPayment(
+    input: CreatePaymentInput, method: CashMethod,
+  ): Promise<CreateTicketResult> {
+    const paymentId = `mock_${randomUUID()}`;
+    // A diferencia del checkout, el cupón queda PENDIENTE (simula que se paga
+    // después en la red de cobranza). La misma página de checkout simulada
+    // permite "aprobarlo" para probar el flujo completo.
+    this.statuses.set(paymentId, 'pendiente');
+    const ticketUrl =
+      `${config.publicBaseUrl}/api/public/payments/mock/${paymentId}` +
+      `?token=${encodeURIComponent(input.formToken)}&method=${method}`;
+    return { paymentId, ticketUrl };
   }
 
   async getStatus(paymentId: string): Promise<PaymentStatus> {

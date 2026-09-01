@@ -335,3 +335,12 @@ ALTER TABLE enrollments
   ADD COLUMN IF NOT EXISTS pago_completo BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE enrollments
   ADD COLUMN IF NOT EXISTS pago_completo_at TIMESTAMPTZ;
+
+-- Estado 'preinscripto': el alumno generó un cupón de pago en efectivo
+-- (Rapipago / Pago Fácil) y todavía no lo abonó. Cuando el pago se acredita
+-- (webhook), pasa a 'pagado' y sigue el flujo normal.
+ALTER TABLE enrollments DROP CONSTRAINT IF EXISTS enrollments_status_check;
+ALTER TABLE enrollments
+  ADD CONSTRAINT enrollments_status_check
+  CHECK (status IN ('nuevo','contactado','inscripto','pagado','completado',
+                    'cancelado','pendiente_verificacion','preinscripto'));

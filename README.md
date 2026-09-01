@@ -201,6 +201,66 @@ docker compose exec -e ADMIN_EMAIL=admin@escuelastop.com.ar \
 Luego ingresá en `http://localhost:3000/login`. En producción, definí un
 `JWT_SECRET` largo y aleatorio (ver `.env.example`).
 
+## Pagos (seña de reserva)
+
+La seña es un **anticipo**: el alumno paga para reservar, queda matriculado en un
+curso abierto (respetando el cupo) y **completa el resto del pago en la sucursal**.
+El **código de alumno** (para rendir el examen) recién se habilita cuando
+administración marca el pago total como completo desde el panel.
+
+### Flujo del pago
+
+1. El alumno completa sus datos y elige **cómo pagar la seña**:
+   - **Tarjeta / dinero en cuenta** → Checkout de Mercado Pago.
+   - **Efectivo** → cupón de **Rapipago / Pago Fácil**. Queda en estado
+     `preinscripto` hasta abonarlo; al acreditarse sigue el flujo normal.
+2. Con la seña acreditada elige **sucursal y curso abierto** y queda matriculado.
+3. La inscripción aparece en el panel con el pago **"Pendiente de completar"** y un
+   botón **"Registrar pago"** que habilita el código y notifica al alumno.
+
+Confirmación del pago: por **webhook** de Mercado Pago
+(`POST /api/webhooks/mercadopago`) y, como respaldo, por *polling* mientras el
+alumno tiene el formulario abierto.
+
+### Proveedores (`PAYMENT_PROVIDER`)
+
+| Valor | Uso |
+|-------|-----|
+| `mock` (default) | Desarrollo. El checkout se aprueba solo; el cupón queda pendiente hasta confirmarlo en la página simulada. No cobra nada. |
+| `mercadopago` | Producción. Requiere `MP_ACCESS_TOKEN`. |
+
+### Puesta en producción con Mercado Pago
+
+1. En el `.env` del servidor:
+
+   ```env
+   PAYMENT_PROVIDER=mercadopago
+   MP_ACCESS_TOKEN=APP_USR-...        # Access Token de PRODUCCIÓN (panel de MP)
+   PUBLIC_BASE_URL=https://api.tudominio.com   # URL pública del backend
+   FORM_BASE_URL=https://tudominio.com         # base del formulario (back del checkout)
+   ```
+
+   `PUBLIC_BASE_URL` **debe ser accesible desde internet**: Mercado Pago le pega
+   ahí al webhook y arma los `back_urls`. Si el backend no es público, el pago
+   solo se confirma por *polling* (con el formulario abierto).
+
+2. En el panel de Mercado Pago, habilitá las **notificaciones/webhooks** hacia
+   `https://api.tudominio.com/api/webhooks/mercadopago` (tipo *payment*).
+
+3. **Rapipago / Pago Fácil** requieren el **email** del alumno (el formulario ya lo
+   pide y bloquea el cupón si falta).
+
+> Nota: el efectivo se implementa con la API de pagos de Mercado Pago
+> (`payment_method_id: rapipago | pagofacil`), que devuelve la URL del cupón
+> imprimible. No hace falta integrar cada red por separado.
+
+### Notificaciones
+
+Cada paso (seña acreditada, inscripción confirmada, código habilitado) avisa al
+alumno por **WhatsApp** (si el canal está vinculado) y por **mail** (si hay SMTP
+configurado; ver variables `SMTP_*` / `MAIL_FROM` en `.env.example`). Si falta el
+SMTP, el mail queda deshabilitado y se notifica solo por WhatsApp.
+
 ## Roadmap (próximos pasos)
 
 - [x] **Autenticación** del dashboard (`admin_users`).

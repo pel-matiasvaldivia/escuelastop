@@ -15,14 +15,28 @@ export interface CreatePaymentInput {
 }
 
 export interface CreatePaymentResult {
-  paymentId: string;   // id/preferencia del proveedor
+  paymentId: string;   // handle que el proveedor entiende para consultar el estado
   checkoutUrl: string; // URL a la que redirigir al alumno para pagar
+}
+
+/** Medio de pago en efectivo con cupón (redes de cobranza). */
+export type CashMethod = 'rapipago' | 'pagofacil';
+
+export interface CreateTicketResult {
+  paymentId: string;  // handle para consultar el estado
+  ticketUrl: string;  // URL del cupón imprimible (Rapipago / Pago Fácil)
 }
 
 export interface PaymentProvider {
   /** Crea el cobro de la seña y devuelve la URL de checkout. */
   createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult>;
-  /** Consulta el estado de un pago por su id. */
+  /**
+   * Crea un cobro en EFECTIVO con cupón (Rapipago / Pago Fácil). El pago queda
+   * pendiente hasta que la persona lo abona en la red de cobranza; ahí el webhook
+   * lo confirma. Requiere el email del pagador.
+   */
+  createTicketPayment(input: CreatePaymentInput, method: CashMethod): Promise<CreateTicketResult>;
+  /** Consulta el estado de un pago por su handle. */
   getStatus(paymentId: string): Promise<PaymentStatus>;
   /**
    * Interpreta el payload de un webhook del proveedor y devuelve el pago afectado

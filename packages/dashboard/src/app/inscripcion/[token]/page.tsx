@@ -50,6 +50,9 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [simulatedPay, setSimulatedPay] = useState(false);
+  // Sub-paso del pago: elegir método, esperar acreditación, o cupón en efectivo.
+  const [payMode, setPayMode] = useState<'choose' | 'waiting' | 'ticket'>('choose');
+  const [ticketUrl, setTicketUrl] = useState<string | null>(null);
   // Cursos abiertos de la sucursal elegida (paso post-pago) + cohorte elegido.
   const [openCourses, setOpenCourses] = useState<OpenCourseOption[] | null>(null);
   const [coursesLoading, setCoursesLoading] = useState(false);
@@ -144,15 +147,59 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
       }
 
       if (!requiresPayment) { setStep('turno'); return; }
-      const { checkoutUrl, simulated } = await api.startPayment(token, course.id, undefined, values.email);
-      setSimulatedPay(!!simulated);
+      // Vamos al paso de pago para que el alumno elija el medio.
+      setPayMode('choose');
+      setTicketUrl(null);
       setStep('pago');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudieron guardar los datos');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Pago con tarjeta / dinero en cuenta (Mercado Pago Checkout).
+  async function payWithCheckout() {
+    if (!course) return;
+    setBusy(true);
+    try {
+      const { checkoutUrl, simulated } = await api.startPayment(token, course.id, {
+        payerEmail: values.email, method: 'checkout',
+      });
+      setSimulatedPay(!!simulated);
+      setPayMode('waiting');
       // En modo test (mock) el pago se aprueba solo: no abrimos checkout, solo
       // hacemos polling hasta que el backend confirme y avanzamos al turno.
-      if (!simulated) window.open(checkoutUrl, '_blank');
+      if (!simulated && checkoutUrl) window.open(checkoutUrl, '_blank');
       startPolling();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error iniciando el pago');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Pago en efectivo con cupón (Rapipago / Pago Fácil): queda pre-inscripto.
+  async function payWithTicket(method: 'rapipago' | 'pagofacil') {
+    if (!course) return;
+    if (!values.email) {
+      alert('Para pagar en efectivo necesitamos tu email (para enviarte el cupón).');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { ticketUrl: url } = await api.startPayment(token, course.id, {
+        payerEmail: values.email, method,
+      });
+      if (url) {
+        setTicketUrl(url);
+        setPayMode('ticket');
+        window.open(url, '_blank');
+        // Seguimos consultando por si paga el cupón mientras tanto.
+        startPolling();
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo generar el cupón');
     } finally {
       setBusy(false);
     }
@@ -260,18 +307,78 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
         </>
       )}
 
-      {/* Paso 2: esperando confirmación del pago */}
-      {step === 'pago' && (
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <p style={{ fontSize: 15 }}>
-            {simulatedPay ? 'Procesando el pago de prueba…' : 'Esperando la confirmación del pago…'}
-          </p>
-          <p style={{ color: '#64748b', fontSize: 14 }}>
-            {simulatedPay
-              ? 'Estás en modo de prueba: la seña se acredita automáticamente. En unos segundos vas a poder elegir tu turno.'
-              : 'Completá el pago en la pestaña que se abrió. Esta página se actualiza sola cuando se acredite.'}
-          </p>
-          <div style={{ fontSize: 32 }}>⏳</div>
+      {/* Paso 2: pago de la seña */}
+      {step === 'pago' && course && (
+        <div style={{ padding: '12px 0' }}>
+          {/* 2.a) Elegir medio de pago */}
+          {payMode === 'choose' && (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <p style={{ ...note }}>
+                Pagá la seña de <b>${course.seniaReserva!.toLocaleString('es-AR')}</b> para
+                reservar tu lugar. Elegí cómo querés pagar:
+              </p>
+              <button type="button" onClick={payWithCheckout} disabled={busy} style={submitBtn}>
+                💳 Pagar con tarjeta o dinero en cuenta (Mercado Pago)
+              </button>
+              <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>o en efectivo</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  type="button" onClick={() => payWithTicket('rapipago')} disabled={busy}
+                  style={{ ...cashBtn, flex: 1 }}
+                >
+                  🧾 Rapipago
+                </button>
+                <button
+                  type="button" onClick={() => payWithTicket('pagofacil')} disabled={busy}
+                  style={{ ...cashBtn, flex: 1 }}
+                >
+                  🧾 Pago Fácil
+                </button>
+              </div>
+              <p style={{ color: '#64748b', fontSize: 12 }}>
+                Con efectivo generamos un cupón: quedás <b>pre-inscripto</b> y tu lugar se
+                confirma cuando lo abonás en Rapipago o Pago Fácil.
+              </p>
+            </div>
+          )}
+
+          {/* 2.b) Esperando acreditación (checkout) */}
+          {payMode === 'waiting' && (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <p style={{ fontSize: 15 }}>
+                {simulatedPay ? 'Procesando el pago de prueba…' : 'Esperando la confirmación del pago…'}
+              </p>
+              <p style={{ color: '#64748b', fontSize: 14 }}>
+                {simulatedPay
+                  ? 'Estás en modo de prueba: la seña se acredita automáticamente. En unos segundos vas a poder elegir tu curso.'
+                  : 'Completá el pago en la pestaña que se abrió. Esta página se actualiza sola cuando se acredite.'}
+              </p>
+              <div style={{ fontSize: 32 }}>⏳</div>
+            </div>
+          )}
+
+          {/* 2.c) Cupón en efectivo generado (pre-inscripto) */}
+          {payMode === 'ticket' && (
+            <div style={{ textAlign: 'center', padding: '12px 0' }}>
+              <div style={{ fontSize: 40 }}>🧾</div>
+              <h3>Quedaste pre-inscripto</h3>
+              <p style={{ color: '#475569', fontSize: 14 }}>
+                Generamos tu cupón de pago por <b>${course.seniaReserva!.toLocaleString('es-AR')}</b>.
+                Pagalo en <b>Rapipago o Pago Fácil</b>. Cuando se acredite, tu lugar queda
+                confirmado y vas a poder elegir tu curso.
+              </p>
+              {ticketUrl && (
+                <a href={ticketUrl} target="_blank" rel="noreferrer"
+                  style={{ ...submitBtn, display: 'inline-block', textDecoration: 'none', marginTop: 8 }}>
+                  Ver / imprimir el cupón
+                </a>
+              )}
+              <p style={{ color: '#94a3b8', fontSize: 12, marginTop: 12 }}>
+                Esta página se actualiza sola cuando se acredite el pago. También podés
+                cerrarla: te avisamos por WhatsApp y mail.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -500,3 +607,4 @@ const label: React.CSSProperties = { display: 'block', fontSize: 13, color: '#47
 const input: React.CSSProperties = { width: '100%', padding: 10, borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 };
 const note: React.CSSProperties = { background: '#fef9c3', padding: 10, borderRadius: 8, fontSize: 13 };
 const submitBtn: React.CSSProperties = { padding: '12px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, cursor: 'pointer', fontWeight: 600 };
+const cashBtn: React.CSSProperties = { padding: '12px 16px', background: '#fff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontWeight: 600 };
