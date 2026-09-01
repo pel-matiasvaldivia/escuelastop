@@ -43,6 +43,9 @@ export interface Enrollment {
   curso_fecha_inicio?: string | null;
   curso_cupo_maximo?: number | null;
   curso_activos?: number | null;
+  /** La seña es un anticipo; pago_completo indica si se saldó el total. */
+  pago_completo?: boolean;
+  pago_completo_at?: string | null;
   updated_at: string;
 }
 
@@ -523,10 +526,23 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo guardar el turno');
-    // Cuando hubo matriculación automática, incluye el código del alumno.
+    // Con matriculación automática, la inscripción queda con el pago pendiente de
+    // completar (la seña es un anticipo); el código se habilita más adelante.
     return res.json() as Promise<Enrollment & {
-      codigo_alumno?: string; curso_nombre?: string; curso_fecha_inicio?: string | null;
+      pago_pendiente?: boolean; saldo_pendiente?: number | null;
+      curso_nombre?: string; curso_fecha_inicio?: string | null;
     }>;
+  },
+
+  /** Marca el pago total como completo y habilita el código del alumno. */
+  async completePayment(enrollmentId: string): Promise<Enrollment> {
+    const res = await fetch(`${API_URL}/api/enrollments/${enrollmentId}/complete-payment`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    handle401(res);
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo registrar el pago');
+    return res.json();
   },
 
   /** Handoff a humano: pausa o reanuda el bot para un contacto. */

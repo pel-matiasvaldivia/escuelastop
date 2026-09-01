@@ -327,3 +327,11 @@ ALTER TABLE course_students
 ALTER TABLE enrollments
   ADD COLUMN IF NOT EXISTS training_course_id UUID REFERENCES training_courses(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_enrollments_training_course ON enrollments(training_course_id);
+
+-- La seña es un ANTICIPO: el alumno queda matriculado pero debe completar el
+-- resto del pago de forma presencial. `pago_completo` lo marca administración
+-- cuando cobra el saldo; recién ahí se HABILITA el código del alumno para rendir.
+ALTER TABLE enrollments
+  ADD COLUMN IF NOT EXISTS pago_completo BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE enrollments
+  ADD COLUMN IF NOT EXISTS pago_completo_at TIMESTAMPTZ;

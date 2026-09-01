@@ -8,7 +8,8 @@ import { listInstructores } from '../services/auth.js';
 import {
   listTrainingCourses, getTrainingCourse, getTrainingCourseView, createTrainingCourse,
   updateTrainingCourse, trainingInSucursal, listStudents, getStudent, studentSucursal, addStudent,
-  findStudentByCodigo, removeStudent, darDeBaja, reactivarStudent, setStudentTeoria, setPractica,
+  findStudentByCodigo, isCodigoHabilitado, removeStudent, darDeBaja, reactivarStudent,
+  setStudentTeoria, setPractica,
   cerrarAlumno, listClasses, createClass, deleteClass, classCourseId, getAttendance, setAttendance,
   attendanceSummary,
 } from '../services/training.js';
@@ -530,6 +531,14 @@ export function makeFase2Router(): Router {
     const student = await findStudentByCodigo(dni, codigo);
     if (!student) {
       res.status(404).json({ error: 'No encontramos tus datos. Revisá el DNI y el código.' });
+      return;
+    }
+    // La seña es un anticipo: sin el pago total completo, el código no habilita.
+    if (!(await isCodigoHabilitado(student.id))) {
+      res.status(402).json({
+        error: 'Tu código todavía no está habilitado: falta completar el pago del curso ' +
+          'en la sucursal. Acercate a administración para terminar de abonar.',
+      });
       return;
     }
     const session = await pendingSessionForStudent(student.id);

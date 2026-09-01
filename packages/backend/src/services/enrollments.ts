@@ -24,6 +24,9 @@ export interface Enrollment {
   paid_at: string | null;
   /** Cohorte (training_courses) en el que quedó matriculado tras pagar/elegir. */
   training_course_id: string | null;
+  /** true = se completó el pago total (la seña es solo un anticipo). */
+  pago_completo: boolean;
+  pago_completo_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -92,6 +95,32 @@ export async function listEnrollments(
     ...r,
     curso_activos: r.curso_activos == null ? null : Number(r.curso_activos),
   }));
+}
+
+/**
+ * Marca el pago total como completo (administración cobró el saldo presencial).
+ * Recién con esto se habilita el código del alumno para rendir. Deja constancia
+ * en las notas. Idempotente: si ya estaba completo, no vuelve a anotar.
+ */
+export async function completeEnrollmentPayment(
+  id: string, reviewer: string,
+): Promise<{ enrollment: Enrollment; changed: boolean } | null> {
+  const current = await getEnrollmentById(id);
+  if (!current) return null;
+  if (current.pago_completo) return { enrollment: current, changed: false };
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const note = `💰 Pago total completado, registrado por ${reviewer} (${stamp})`;
+  const res = await query<Enrollment>(
+    `UPDATE enrollments
+        SET pago_completo = TRUE, pago_completo_at = now(),
+            status = 'pagado',
+            notes = COALESCE(notes || E'\\n', '') || $2,
+            updated_at = now()
+      WHERE id = $1 RETURNING *`,
+    [id, note],
+  );
+  return res.rows[0] ? { enrollment: res.rows[0], changed: true } : null;
 }
 
 /** Vincula la inscripción al cohorte en el que quedó matriculada. */

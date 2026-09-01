@@ -362,6 +362,35 @@ export async function addStudent(input: {
   return { error: 'No se pudo generar un código único, reintentá' };
 }
 
+/** Alumno activo matriculado a partir de una inscripción (para notificar/gate). */
+export async function getStudentByEnrollment(enrollmentId: string): Promise<CourseStudent | null> {
+  const res = await query<CourseStudent>(
+    `SELECT * FROM course_students
+      WHERE enrollment_id = $1 AND estado <> 'baja'
+      ORDER BY created_at DESC LIMIT 1`,
+    [enrollmentId],
+  );
+  return res.rows[0] ?? null;
+}
+
+/**
+ * ¿El código del alumno está habilitado para rendir? Si la matrícula viene de
+ * una inscripción online, se exige que el pago total esté completo (la seña es
+ * solo un anticipo). Los alumnos cargados a mano (sin inscripción) no tienen
+ * este gate.
+ */
+export async function isCodigoHabilitado(courseStudentId: string): Promise<boolean> {
+  const res = await query<{ habilitado: boolean }>(
+    `SELECT NOT EXISTS (
+       SELECT 1 FROM course_students cs
+       JOIN enrollments e ON e.id = cs.enrollment_id
+       WHERE cs.id = $1 AND e.pago_completo = FALSE
+     ) AS habilitado`,
+    [courseStudentId],
+  );
+  return res.rows[0]?.habilitado ?? true;
+}
+
 /** Busca un alumno por DNI + código (para el kiosco del examen en la tablet). */
 export async function findStudentByCodigo(
   dni: string, codigo: string,

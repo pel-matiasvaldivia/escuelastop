@@ -45,6 +45,8 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [payBusyId, setPayBusyId] = useState<string | null>(null);
+
   // Reasignar una inscripción a otra sucursal (solo admin).
   async function reassign(enrollmentId: string, sede: string) {
     if (!sede) return;
@@ -53,6 +55,22 @@ export default function HomePage() {
       setEnrollments((prev) => prev.map((e) => (e.id === enrollmentId ? updated : e)));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo reasignar');
+    }
+  }
+
+  // Registrar el pago total (la seña era un anticipo): habilita el código y
+  // notifica al alumno. El backend valida el acceso por sucursal.
+  async function completePay(enrollmentId: string) {
+    if (!confirm('¿Confirmás que el alumno completó el pago total del curso? ' +
+      'Se habilita su código y se le avisa por WhatsApp y mail.')) return;
+    setPayBusyId(enrollmentId);
+    try {
+      const updated = await api.completePayment(enrollmentId);
+      setEnrollments((prev) => prev.map((e) => (e.id === enrollmentId ? { ...e, ...updated } : e)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo registrar el pago');
+    } finally {
+      setPayBusyId(null);
     }
   }
 
@@ -108,7 +126,13 @@ export default function HomePage() {
                     e.sede ?? '—'
                   )}
                 </td>
-                <td style={td}><PaymentCell e={e} /></td>
+                <td style={td}>
+                  <PaymentCell
+                    e={e}
+                    busy={payBusyId === e.id}
+                    onComplete={() => completePay(e.id)}
+                  />
+                </td>
                 <td style={td}><CohorteCell e={e} /></td>
                 <td style={td}><StatusBadge status={e.status} /></td>
                 <td style={td}>{new Date(e.updated_at).toLocaleString('es-AR')}</td>
@@ -152,24 +176,48 @@ export default function HomePage() {
   );
 }
 
-/** Completud de la seña: estado + monto acreditado. */
-function PaymentCell({ e }: { e: Enrollment }) {
+/** Completud del pago: seña (anticipo) + estado del pago total. */
+function PaymentCell({
+  e, busy, onComplete,
+}: { e: Enrollment; busy: boolean; onComplete: () => void }) {
   const colors: Record<string, string> = {
     aprobado: '#16a34a', pendiente: '#ea580c', rechazado: '#dc2626',
   };
+  const senaPaga = e.payment_status === 'aprobado';
+  const pagoCompleto = !!e.pago_completo;
   return (
-    <span style={{ fontSize: 13 }}>
-      <span style={{
-        background: colors[e.payment_status] ?? '#64748b', color: '#fff',
-        padding: '2px 8px', borderRadius: 12, fontSize: 12,
-      }}>
-        {e.payment_status === 'aprobado' ? 'seña paga' : e.payment_status}
-      </span>
-      {e.payment_amount != null && (
-        <span style={{ color: '#475569', marginLeft: 6 }}>
-          ${e.payment_amount.toLocaleString('es-AR')}
+    <span style={{ fontSize: 13, display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
+      <span>
+        <span style={{
+          background: colors[e.payment_status] ?? '#64748b', color: '#fff',
+          padding: '2px 8px', borderRadius: 12, fontSize: 12,
+        }}>
+          {senaPaga ? 'seña paga' : e.payment_status}
         </span>
-      )}
+        {e.payment_amount != null && (
+          <span style={{ color: '#475569', marginLeft: 6 }}>
+            ${e.payment_amount.toLocaleString('es-AR')}
+          </span>
+        )}
+      </span>
+      {pagoCompleto ? (
+        <span style={{ color: '#15803d', fontWeight: 600 }}>✓ Pago completo</span>
+      ) : senaPaga ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ color: '#b45309' }}>⏳ Pendiente de completar pago</span>
+          <button
+            onClick={onComplete}
+            disabled={busy}
+            style={{
+              padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6,
+              opacity: busy ? 0.6 : 1,
+            }}
+          >
+            {busy ? '…' : 'Registrar pago'}
+          </button>
+        </span>
+      ) : null}
     </span>
   );
 }

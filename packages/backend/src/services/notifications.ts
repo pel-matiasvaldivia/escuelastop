@@ -82,21 +82,46 @@ export async function notifyPaymentApproved(
   await notify(channel, enrollment.contact_id, 'Seña confirmada — Escuela STOP', text);
 }
 
-/** Paso: quedó matriculado en un cohorte concreto. Info completa del curso. */
+/**
+ * Paso: quedó matriculado en un cohorte concreto con la SEÑA (anticipo). Avisa
+ * que la inscripción está confirmada pero que debe completar el resto del pago
+ * de forma presencial. NO revela el código todavía (se habilita al completar).
+ */
 export async function notifyMatriculado(
   channel: MessagingChannel,
   enrollment: Enrollment,
   course: TrainingCourse,
-  student: CourseStudent,
+  saldo: number | null,
 ): Promise<void> {
   const dir = direccionSucursal(course.sede);
+  const saldoLinea = saldo && saldo > 0
+    ? `Saldo a completar en la sucursal: *${money(saldo)}*\n`
+    : `El *resto del pago* se completa de forma presencial en la sucursal.\n`;
   const text =
-    `🎓 *¡Matriculación confirmada!*\n\n` +
+    `🎓 *¡Inscripción confirmada!*\n\n` +
     `Curso: *${course.nombre}*\n` +
     `Sucursal: *${course.sede ?? '—'}*${dir ? `\n${dir}` : ''}\n` +
-    `Inicio: *${fecha(course.fecha_inicio)}*\n` +
+    `Inicio: *${fecha(course.fecha_inicio)}*\n\n` +
+    `Pagaste la seña de *${money(enrollment.payment_amount)}* (anticipo). ` +
+    saldoLinea +
+    `\nCuando completes el pago te *habilitamos tu código de alumno* para rendir ` +
+    `el examen y te lo enviamos por acá y por mail. ¡Nos vemos! 🚗`;
+  await notify(channel, enrollment.contact_id, 'Inscripción confirmada — Escuela STOP', text);
+}
+
+/** Paso: se completó el pago total → se habilita y se envía el código de alumno. */
+export async function notifyCodigoHabilitado(
+  channel: MessagingChannel,
+  enrollment: Enrollment,
+  course: TrainingCourse | null,
+  student: CourseStudent,
+): Promise<void> {
+  const nombreCurso = course?.nombre ?? enrollment.course ?? 'tu curso';
+  const text =
+    `✅ *¡Pago completo registrado!*\n\n` +
+    `Curso: *${nombreCurso}*\n` +
     `Tu código de alumno: *${student.codigo}*\n\n` +
-    `Guardá este código: lo vas a usar para rendir el examen. ` +
-    `Cualquier cambio te lo avisamos por acá. ¡Nos vemos! 🚗`;
-  await notify(channel, enrollment.contact_id, 'Matriculación confirmada — Escuela STOP', text);
+    `Ya está *habilitado*: guardá este código porque lo vas a usar para rendir ` +
+    `el examen. ¡Éxitos! 🚗`;
+  await notify(channel, enrollment.contact_id, 'Código de alumno habilitado — Escuela STOP', text);
 }

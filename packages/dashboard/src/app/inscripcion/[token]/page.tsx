@@ -54,8 +54,12 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
   const [openCourses, setOpenCourses] = useState<OpenCourseOption[] | null>(null);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [chosenCourse, setChosenCourse] = useState('');
-  // Resultado de la matriculación (código de alumno + curso) para la pantalla final.
-  const [matricula, setMatricula] = useState<{ codigo: string; curso: string } | null>(null);
+  // Resultado de la matriculación para la pantalla final. Con la seña (anticipo)
+  // el alumno queda inscripto pero con el pago pendiente de completar; el código
+  // se habilita cuando administración registra el pago total.
+  const [matricula, setMatricula] = useState<
+    { curso: string; saldo: number | null } | null
+  >(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -184,9 +188,10 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
           fullName: values.nombre,
           dni: values.dni,
         });
-        if (resp.codigo_alumno) {
-          setMatricula({ codigo: resp.codigo_alumno, curso: resp.curso_nombre ?? course?.name ?? '' });
-        }
+        setMatricula({
+          curso: resp.curso_nombre ?? course?.name ?? '',
+          saldo: resp.saldo_pendiente ?? null,
+        });
       } else {
         // No hay cohortes abiertos: guardamos la sucursal y administración coordina.
         await api.saveSchedule(token, { sede: values.sucursal });
@@ -378,20 +383,28 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 40 }}>🎉</div>
           <h3>¡Inscripción confirmada!</h3>
-          <p>Te esperamos en <b>{matricula?.curso || course?.name}</b>.</p>
+          <p>Quedaste inscripto en <b>{matricula?.curso || course?.name}</b>.</p>
           {matricula ? (
             <>
-              <p style={{ marginBottom: 6 }}>Tu código de alumno:</p>
               <div style={{
-                display: 'inline-block', padding: '10px 22px', borderRadius: 10,
-                border: '2px dashed #16a34a', background: '#f0fdf4',
-                fontSize: 28, fontWeight: 700, letterSpacing: 3, color: '#166534',
+                textAlign: 'left', margin: '14px auto 0', maxWidth: 420,
+                padding: '12px 16px', borderRadius: 10,
+                border: '1px solid #fde68a', background: '#fffbeb',
               }}>
-                {matricula.codigo}
+                <p style={{ margin: '0 0 6px', fontWeight: 700, color: '#92400e' }}>
+                  💳 Falta completar el pago
+                </p>
+                <p style={{ margin: 0, fontSize: 14, color: '#78350f' }}>
+                  Pagaste la <b>seña (anticipo)</b>. El resto del curso
+                  {typeof matricula.saldo === 'number' && matricula.saldo > 0
+                    ? <> —<b> ${matricula.saldo.toLocaleString('es-AR')}</b>— </>
+                    : ' '}
+                  se abona <b>de forma presencial en la sucursal</b>.
+                </p>
               </div>
               <p style={{ color: '#475569', fontSize: 14, marginTop: 12 }}>
-                Guardá este código: lo vas a usar para rendir el examen. También te lo
-                enviamos por WhatsApp y por mail.
+                Cuando completes el pago te <b>habilitamos tu código de alumno</b> para
+                rendir el examen y te lo enviamos por WhatsApp y por mail.
               </p>
             </>
           ) : (
