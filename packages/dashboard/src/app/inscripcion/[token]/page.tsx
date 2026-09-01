@@ -54,6 +54,8 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
   const [openCourses, setOpenCourses] = useState<OpenCourseOption[] | null>(null);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [chosenCourse, setChosenCourse] = useState('');
+  // Resultado de la matriculación (código de alumno + curso) para la pantalla final.
+  const [matricula, setMatricula] = useState<{ codigo: string; curso: string } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -177,11 +179,14 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
     try {
       if (chosenCourse) {
         // Matriculación automática en el cohorte elegido.
-        await api.saveSchedule(token, {
+        const resp = await api.saveSchedule(token, {
           trainingCourseId: chosenCourse,
           fullName: values.nombre,
           dni: values.dni,
         });
+        if (resp.codigo_alumno) {
+          setMatricula({ codigo: resp.codigo_alumno, curso: resp.curso_nombre ?? course?.name ?? '' });
+        }
       } else {
         // No hay cohortes abiertos: guardamos la sucursal y administración coordina.
         await api.saveSchedule(token, { sede: values.sucursal });
@@ -373,7 +378,25 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 40 }}>🎉</div>
           <h3>¡Inscripción confirmada!</h3>
-          <p>Te esperamos en <b>{course?.name}</b>. Un asesor te va a escribir por WhatsApp.</p>
+          <p>Te esperamos en <b>{matricula?.curso || course?.name}</b>.</p>
+          {matricula ? (
+            <>
+              <p style={{ marginBottom: 6 }}>Tu código de alumno:</p>
+              <div style={{
+                display: 'inline-block', padding: '10px 22px', borderRadius: 10,
+                border: '2px dashed #16a34a', background: '#f0fdf4',
+                fontSize: 28, fontWeight: 700, letterSpacing: 3, color: '#166534',
+              }}>
+                {matricula.codigo}
+              </div>
+              <p style={{ color: '#475569', fontSize: 14, marginTop: 12 }}>
+                Guardá este código: lo vas a usar para rendir el examen. También te lo
+                enviamos por WhatsApp y por mail.
+              </p>
+            </>
+          ) : (
+            <p>Un asesor te va a escribir por WhatsApp.</p>
+          )}
         </div>
       )}
     </div>

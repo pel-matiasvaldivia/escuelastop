@@ -523,7 +523,10 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo guardar el turno');
-    return res.json();
+    // Cuando hubo matriculación automática, incluye el código del alumno.
+    return res.json() as Promise<Enrollment & {
+      codigo_alumno?: string; curso_nombre?: string; curso_fecha_inicio?: string | null;
+    }>;
   },
 
   /** Handoff a humano: pausa o reanuda el bot para un contacto. */
