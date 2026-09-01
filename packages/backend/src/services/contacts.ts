@@ -18,6 +18,12 @@ export interface Contact {
   updated_at: string;
 }
 
+/** Busca un contacto por su id (para notificaciones y matriculación). */
+export async function getContactById(id: string): Promise<Contact | null> {
+  const res = await query<Contact>('SELECT * FROM contacts WHERE id = $1', [id]);
+  return res.rows[0] ?? null;
+}
+
 /** Busca un contacto por su wa_id o lo crea si no existe. */
 export async function getOrCreateContact(waId: string, phone?: string): Promise<Contact> {
   const existing = await query<Contact>('SELECT * FROM contacts WHERE wa_id = $1', [waId]);

@@ -51,4 +51,19 @@ export const config = {
     jwtSecret: process.env.JWT_SECRET ?? 'dev-secret-cambiar-en-produccion',
     tokenTtlHours: Number(process.env.JWT_TTL_HOURS ?? 12),
   },
+  // Envío de mails de notificación (SMTP). Si SMTP_HOST no está configurado, el
+  // envío de mail queda deshabilitado (no-op) y solo se notifica por WhatsApp.
+  mail: {
+    host: process.env.SMTP_HOST ?? '',
+    port: Number(process.env.SMTP_PORT ?? 587),
+    // secure=true para 465 (SSL); false para 587/25 (STARTTLS). Autodetecta por
+    // el puerto salvo que se fuerce con SMTP_SECURE.
+    secure: process.env.SMTP_SECURE
+      ? process.env.SMTP_SECURE === 'true'
+      : Number(process.env.SMTP_PORT ?? 587) === 465,
+    user: process.env.SMTP_USER ?? '',
+    pass: process.env.SMTP_PASS ?? '',
+    // Remitente que ve el alumno. Cae al usuario SMTP si no se define.
+    from: process.env.MAIL_FROM ?? process.env.SMTP_USER ?? 'Escuela STOP <no-reply@escuelastop>',
+  },
 };

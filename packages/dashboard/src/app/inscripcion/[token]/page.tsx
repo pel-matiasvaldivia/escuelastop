@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, type Course, type FormFieldKey , type SucursalInfo } from '../../../lib/api';
+import {
+  api, type Course, type FormFieldKey, type SucursalInfo, type OpenCourseOption,
+} from '../../../lib/api';
+
+function fmtFecha(iso: string | null): string {
+  if (!iso) return 'a confirmar';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? 'a confirmar' : d.toLocaleDateString('es-AR');
+}
 
 const FIELD_LABELS: Record<FormFieldKey, string> = {
   nombre: 'Nombre y apellido',
@@ -42,6 +50,16 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [simulatedPay, setSimulatedPay] = useState(false);
+  // Cursos abiertos de la sucursal elegida (paso post-pago) + cohorte elegido.
+  const [openCourses, setOpenCourses] = useState<OpenCourseOption[] | null>(null);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [chosenCourse, setChosenCourse] = useState('');
+  // Resultado de la matriculación para la pantalla final. Con la seña (anticipo)
+  // el alumno queda inscripto pero con el pago pendiente de completar; el código
+  // se habilita cuando administración registra el pago total.
+  const [matricula, setMatricula] = useState<
+    { curso: string; saldo: number | null } | null
+  >(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -67,12 +85,29 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [token]);
 
+  // Al entrar al paso de turno y elegir sucursal, buscamos los cursos ABIERTOS
+  // de esa sucursal para que el alumno elija cohorte y quede matriculado.
+  useEffect(() => {
+    if (step !== 'turno' || !values.sucursal) {
+      setOpenCourses(null);
+      setChosenCourse('');
+      return;
+    }
+    let cancelled = false;
+    setCoursesLoading(true);
+    setChosenCourse('');
+    api.availableCourses(token, values.sucursal)
+      .then((list) => { if (!cancelled) setOpenCourses(list); })
+      .catch(() => { if (!cancelled) setOpenCourses([]); })
+      .finally(() => { if (!cancelled) setCoursesLoading(false); });
+    return () => { cancelled = true; };
+  }, [step, values.sucursal, token]);
+
   const course = useMemo(() => courses.find((c) => c.id === selectedId), [courses, selectedId]);
   const requiresPayment = !!course?.seniaReserva;
 
   // Campos de datos personales (todo menos los que van después del pago).
   const preFields = (course?.requiredFields ?? []).filter((f) => !POST_PAYMENT_FIELDS.includes(f));
-  const postFields = (course?.requiredFields ?? []).filter((f) => POST_PAYMENT_FIELDS.includes(f));
   const needsLicense = (course?.requiredFields ?? []).includes('foto_licencia');
 
   function setField(key: string, value: string) {
@@ -134,18 +169,36 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
     }, 3000);
   }
 
+  // ¿Hay algún cohorte con asiento libre para elegir?
+  const hayCursosElegibles = (openCourses ?? []).some((c) => !c.completo);
+
   async function submitTurno(e: React.FormEvent) {
     e.preventDefault();
+    if (!values.sucursal) { alert('Elegí una sucursal.'); return; }
+    if (hayCursosElegibles && !chosenCourse) {
+      alert('Elegí uno de los cursos disponibles.');
+      return;
+    }
     setBusy(true);
     try {
-      const turnoLabel = course?.schedules?.find((s) => s.id === values.turno);
-      const notes = turnoLabel
-        ? `Turno: ${turnoLabel.sucursal} · ${turnoLabel.turno} · ${turnoLabel.dias} · ${turnoLabel.horario}`
-        : '';
-      await api.saveSchedule(token, values.sucursal ?? '', notes);
+      if (chosenCourse) {
+        // Matriculación automática en el cohorte elegido.
+        const resp = await api.saveSchedule(token, {
+          trainingCourseId: chosenCourse,
+          fullName: values.nombre,
+          dni: values.dni,
+        });
+        setMatricula({
+          curso: resp.curso_nombre ?? course?.name ?? '',
+          saldo: resp.saldo_pendiente ?? null,
+        });
+      } else {
+        // No hay cohortes abiertos: guardamos la sucursal y administración coordina.
+        await api.saveSchedule(token, { sede: values.sucursal });
+      }
       setStep('listo');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'No se pudo guardar el turno');
+      alert(err instanceof Error ? err.message : 'No se pudo confirmar la inscripción');
     } finally {
       setBusy(false);
     }
@@ -222,18 +275,89 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
         </div>
       )}
 
-      {/* Paso 3: elegir sucursal y turno (habilitado SOLO tras pagar) */}
+      {/* Paso 3: elegir sucursal y curso (habilitado SOLO tras pagar) */}
       {step === 'turno' && course && (
         <form onSubmit={submitTurno} style={{ display: 'grid', gap: 14, marginTop: 12 }}>
           {requiresPayment && (
-            <p style={{ ...note, background: '#dcfce7' }}>✅ Seña confirmada. Elegí tu turno.</p>
+            <p style={{ ...note, background: '#dcfce7' }}>
+              ✅ Seña confirmada. Elegí tu sucursal y el curso para quedar matriculado.
+            </p>
           )}
-          {(postFields.length ? postFields : (['sucursal'] as FormFieldKey[]))
-            .map((field) => renderField(field, values, setField, setFile, sucursales, course))}
+          {renderField('sucursal', values, setField, setFile, sucursales, course)}
+
+          {/* Cursos abiertos de la sucursal elegida (con fecha y asientos). */}
+          {values.sucursal && (
+            <div>
+              <label style={label}>Curso disponible *</label>
+              {coursesLoading && <p style={{ color: '#64748b', fontSize: 14 }}>Buscando cursos disponibles…</p>}
+              {!coursesLoading && openCourses && openCourses.length === 0 && (
+                <p style={note}>
+                  Por ahora no hay cursos con fecha abierta en esta sucursal. Podés
+                  confirmar igual y <b>administración te contacta</b> para asignarte
+                  la fecha de inicio.
+                </p>
+              )}
+              {!coursesLoading && openCourses && openCourses.length > 0 && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {openCourses.map((oc) => (
+                    <label
+                      key={oc.id}
+                      style={{
+                        display: 'flex', gap: 10, alignItems: 'flex-start',
+                        padding: 10, borderRadius: 8,
+                        border: `1px solid ${chosenCourse === oc.id ? '#16a34a' : '#cbd5e1'}`,
+                        background: oc.completo ? '#f8fafc' : '#fff',
+                        opacity: oc.completo ? 0.6 : 1,
+                        cursor: oc.completo ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="cohorte"
+                        value={oc.id}
+                        disabled={oc.completo}
+                        checked={chosenCourse === oc.id}
+                        onChange={() => setChosenCourse(oc.id)}
+                        style={{ marginTop: 3 }}
+                      />
+                      <span style={{ fontSize: 14 }}>
+                        <b>{oc.nombre}</b><br />
+                        <span style={{ color: '#475569' }}>
+                          Inicio: {fmtFecha(oc.fecha_inicio)} ·{' '}
+                          {oc.completo
+                            ? 'COMPLETO'
+                            : oc.asientos_libres === null
+                              ? 'Cupos disponibles'
+                              : `${oc.asientos_libres} ${oc.asientos_libres === 1 ? 'asiento' : 'asientos'} libre${oc.asientos_libres === 1 ? '' : 's'}`}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* DNI: necesario para la matrícula si todavía no lo tenemos. */}
+          {values.sucursal && hayCursosElegibles && !values.dni && (
+            <div>
+              <label style={label}>DNI *</label>
+              <input
+                required
+                type="text"
+                value={values.dni ?? ''}
+                onChange={(e) => setField('dni', e.target.value)}
+                style={input}
+              />
+            </div>
+          )}
+
           {course.contactSucursal && (
             <p style={note}>⚠️ Esta modalidad se coordina con la sucursal. Te vamos a contactar.</p>
           )}
-          <button type="submit" disabled={busy} style={submitBtn}>Confirmar inscripción</button>
+          <button type="submit" disabled={busy || !values.sucursal} style={submitBtn}>
+            Confirmar inscripción
+          </button>
         </form>
       )}
 
@@ -259,7 +383,33 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 40 }}>🎉</div>
           <h3>¡Inscripción confirmada!</h3>
-          <p>Te esperamos en <b>{course?.name}</b>. Un asesor te va a escribir por WhatsApp.</p>
+          <p>Quedaste inscripto en <b>{matricula?.curso || course?.name}</b>.</p>
+          {matricula ? (
+            <>
+              <div style={{
+                textAlign: 'left', margin: '14px auto 0', maxWidth: 420,
+                padding: '12px 16px', borderRadius: 10,
+                border: '1px solid #fde68a', background: '#fffbeb',
+              }}>
+                <p style={{ margin: '0 0 6px', fontWeight: 700, color: '#92400e' }}>
+                  💳 Falta completar el pago
+                </p>
+                <p style={{ margin: 0, fontSize: 14, color: '#78350f' }}>
+                  Pagaste la <b>seña (anticipo)</b>. El resto del curso
+                  {typeof matricula.saldo === 'number' && matricula.saldo > 0
+                    ? <> —<b> ${matricula.saldo.toLocaleString('es-AR')}</b>— </>
+                    : ' '}
+                  se abona <b>de forma presencial en la sucursal</b>.
+                </p>
+              </div>
+              <p style={{ color: '#475569', fontSize: 14, marginTop: 12 }}>
+                Cuando completes el pago te <b>habilitamos tu código de alumno</b> para
+                rendir el examen y te lo enviamos por WhatsApp y por mail.
+              </p>
+            </>
+          ) : (
+            <p>Un asesor te va a escribir por WhatsApp.</p>
+          )}
         </div>
       )}
     </div>
