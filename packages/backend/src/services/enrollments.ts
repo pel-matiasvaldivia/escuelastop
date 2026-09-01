@@ -2,7 +2,7 @@ import { query } from '../db/index.js';
 
 export type EnrollmentStatus =
   | 'nuevo' | 'contactado' | 'inscripto' | 'pagado' | 'completado' | 'cancelado'
-  | 'pendiente_verificacion';
+  | 'pendiente_verificacion' | 'preinscripto';
 
 export type PaymentStatus = 'pendiente' | 'aprobado' | 'rechazado';
 

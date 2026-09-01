@@ -487,14 +487,24 @@ export const api = {
   },
 
   // --- Pago de la seña (gate) ---
-  async startPayment(token: string, courseId: string, contactId?: string, payerEmail?: string) {
+  // method: 'checkout' (tarjeta/MP), 'rapipago' | 'pagofacil' (cupón en efectivo).
+  async startPayment(
+    token: string, courseId: string,
+    opts: {
+      contactId?: string; payerEmail?: string;
+      method?: 'checkout' | 'rapipago' | 'pagofacil';
+    } = {},
+  ) {
     const res = await fetch(`${API_URL}/api/public/enrollment/${token}/pay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ courseId, contactId, payerEmail }),
+      body: JSON.stringify({ courseId, ...opts }),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? 'Error iniciando el pago');
-    return res.json() as Promise<{ checkoutUrl: string; formToken: string; simulated?: boolean }>;
+    return res.json() as Promise<{
+      checkoutUrl?: string; ticketUrl?: string; formToken: string;
+      simulated?: boolean; method?: string;
+    }>;
   },
 
   async paymentStatus(token: string) {
