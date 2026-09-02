@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, auth, UnauthorizedError, type AppSettings, type SettingsUpdate } from '../../lib/api';
+import ConfigTabs from '../../components/ConfigTabs';
 
 /**
  * Configuración de la empresa (solo admin): datos y logo, servidor SMTP para las
@@ -136,9 +137,11 @@ export default function ConfiguracionPage() {
         <div>
           <div className="eyebrow">Administración</div>
           <h1>Configuración</h1>
-          <div className="sub">Datos de la empresa, notificaciones por mail y agente de IA.</div>
+          <div className="sub">Empresa, notificaciones, agente de IA, WhatsApp y usuarios.</div>
         </div>
       </div>
+
+      <ConfigTabs />
 
       {notice && <div className="card card-pad" style={okStyle}>{notice}</div>}
       {error && <div className="card card-pad" style={errStyle}>{error}</div>}

@@ -47,12 +47,16 @@ export default function Header() {
 
         {showNav && (
           <nav style={sx.nav}>
-            <Tab href="/" label="Inscripciones" active={pathname === '/'} />
+            <Tab href="/conversaciones" label="Conversaciones"
+              active={pathname.startsWith('/conversaciones') || pathname.startsWith('/contactos')} />
+            <Tab href="/" label="Inscripciones"
+              active={pathname === '/' || pathname.startsWith('/inscripciones')} />
             <Tab href="/capacitaciones" label="Capacitaciones" active={pathname.startsWith('/capacitaciones')} />
-            <Tab href="/whatsapp" label="WhatsApp" active={pathname === '/whatsapp'} />
+            {isAdmin && (
+              <Tab href="/configuracion" label="Configuración"
+                active={pathname.startsWith('/configuracion') || pathname === '/whatsapp' || pathname === '/usuarios'} />
+            )}
             <Tab href="/como-funciona" label="Cómo funciona" active={pathname === '/como-funciona'} />
-            {isAdmin && <Tab href="/usuarios" label="Usuarios" active={pathname === '/usuarios'} />}
-            {isAdmin && <Tab href="/configuracion" label="Configuración" active={pathname === '/configuracion'} />}
           </nav>
         )}
 

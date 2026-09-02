@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   api, auth, UnauthorizedError,
-  type Contact, type Enrollment, type SucursalInfo, type Course, type EnrollmentStats,
+  type Enrollment, type SucursalInfo, type Course, type EnrollmentStats,
 } from '../lib/api';
 
 const PAGE_SIZE = 25;
@@ -16,7 +16,6 @@ export default function HomePage() {
   const [rows, setRows] = useState<Enrollment[]>([]);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<EnrollmentStats | null>(null);
-  const [contacts, setContacts] = useState<Contact[]>([]);
   const [sucursales, setSucursales] = useState<SucursalInfo[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -38,10 +37,10 @@ export default function HomePage() {
     if (!auth.isAuthenticated()) { router.replace('/login'); return; }
     (async () => {
       try {
-        const [c, s, cat, st] = await Promise.all([
-          api.contacts(), api.sucursales(), api.catalog(), api.enrollmentStats(),
+        const [s, cat, st] = await Promise.all([
+          api.sucursales(), api.catalog(), api.enrollmentStats(),
         ]);
-        setContacts(c); setSucursales(s); setCourses(cat); setStats(st);
+        setSucursales(s); setCourses(cat); setStats(st);
       } catch (err) {
         if (err instanceof UnauthorizedError) { router.replace('/login'); return; }
         setError('No se pudo conectar con la API. ¿Está corriendo el backend?');
@@ -133,7 +132,6 @@ export default function HomePage() {
         <Stat ico="🧾" tint="var(--warning-bg)" label="Pre-inscriptos" value={stats?.preinscriptos ?? 0} />
         <Stat ico="⏳" tint="var(--warning-bg)" label="Pago pendiente" value={stats?.pendiente_pago ?? 0} />
         <Stat ico="✅" tint="var(--success-bg)" label="Pago completo" value={stats?.completos ?? 0} />
-        <Stat ico="👥" tint="var(--info-bg)" label="Leads" value={contacts.length} />
       </div>
 
       <section className="card">
@@ -230,40 +228,6 @@ export default function HomePage() {
             <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Página {page} de {totalPages}</span>
             <button className="btn btn-sm" disabled={page >= totalPages || listLoading} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Siguiente →</button>
           </div>
-        </div>
-      </section>
-
-      <section className="card">
-        <div className="card-head">
-          <h2>Leads / Contactos</h2>
-          <span className="badge">{contacts.length}</span>
-        </div>
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Teléfono</th>
-                <th>Interés</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {contacts.length === 0 && (
-                <tr><td colSpan={4}><div className="empty">Sin contactos todavía.</div></td></tr>
-              )}
-              {contacts.slice(0, 25).map((c) => (
-                <tr key={c.id}>
-                  <td style={{ fontWeight: 600 }}>{c.full_name ?? '(sin nombre)'}</td>
-                  <td style={{ color: 'var(--text-2)' }}>{c.phone ?? '—'}</td>
-                  <td style={{ color: 'var(--text-2)' }}>{c.interest ?? '—'}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <Link href={`/contactos/${c.id}`} className="btn btn-ghost btn-sm">Ver conversación →</Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </section>
     </div>

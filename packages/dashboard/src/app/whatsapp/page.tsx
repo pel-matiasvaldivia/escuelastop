@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, auth, UnauthorizedError, type WhatsAppStatus } from '../../lib/api';
+import ConfigTabs from '../../components/ConfigTabs';
 
 /**
  * Vinculación del número de WhatsApp: muestra el QR para escanear desde el
@@ -71,11 +72,13 @@ export default function WhatsAppPage() {
     <div style={{ display: 'grid', gap: 20, maxWidth: 640 }}>
       <div className="page-head">
         <div>
-          <div className="eyebrow">Canal</div>
+          <div className="eyebrow">Configuración</div>
           <h1>Vincular WhatsApp</h1>
           <div className="sub">Conectá el número desde el que responde el agente a los alumnos.</div>
         </div>
       </div>
+
+      <ConfigTabs />
 
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
