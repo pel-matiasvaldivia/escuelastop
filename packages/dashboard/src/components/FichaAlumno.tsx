@@ -93,14 +93,14 @@ function EnrollmentCard({
   }
 
   return (
-    <div style={{
-      background: '#fff', border: `1px solid ${needsReview ? '#fed7aa' : '#e2e8f0'}`,
-      borderRadius: 10, padding: 16,
+    <div className="card" style={{
+      border: `1px solid ${needsReview ? 'var(--warning-br)' : 'var(--border)'}`,
+      padding: 16,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <strong style={{ fontSize: 15 }}>{enrollment.course ?? 'Curso sin definir'}</strong>
-          <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
+          <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>
             {enrollment.sede ?? 'Sede a definir'} ·{' '}
             {new Date(enrollment.updated_at).toLocaleDateString('es-AR')}
           </div>
@@ -146,8 +146,8 @@ function EnrollmentCard({
       {/* --- Notas (incluye el cotejo anti-fraude del vencimiento) --- */}
       {enrollment.notes && (
         <pre style={{
-          marginTop: 12, background: '#f8fafc', border: '1px solid #e2e8f0',
-          borderRadius: 8, padding: 10, fontSize: 12, color: '#475569',
+          marginTop: 12, background: 'var(--surface-2)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-sm)', padding: 10, fontSize: 12, color: 'var(--text-2)',
           whiteSpace: 'pre-wrap', fontFamily: 'inherit',
         }}>{enrollment.notes}</pre>
       )}
@@ -163,13 +163,11 @@ function EnrollmentCard({
             continúe con el pago de la seña.
           </p>
           <input
+            className="input"
             value={note}
             onChange={(ev) => setNote(ev.target.value)}
             placeholder="Nota (opcional): qué verificaste"
-            style={{
-              width: '100%', padding: 8, borderRadius: 8,
-              border: '1px solid #cbd5e1', fontSize: 14, marginBottom: 10,
-            }}
+            style={{ marginBottom: 10 }}
           />
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => review(true)} disabled={busy} style={okBtn}>
@@ -197,8 +195,8 @@ function DocThumb({ doc }: { doc: StudentDocument }) {
       style={{ textDecoration: 'none', color: '#334155' }}
     >
       <div style={{
-        border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden',
-        width: 130, background: '#f8fafc',
+        border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden',
+        width: 130, background: 'var(--surface-2)',
       }}>
         {isImage ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -239,10 +237,10 @@ function statusColor(status: string): string {
 }
 
 const okBtn = {
-  padding: '9px 16px', background: '#16a34a', color: '#fff', border: 'none',
-  borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600,
+  padding: '10px 16px', background: 'var(--success)', color: '#fff', border: '1px solid var(--success)',
+  borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit',
 } as const;
 const noBtn = {
-  padding: '9px 16px', background: '#fff', color: '#dc2626',
-  border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 14,
+  padding: '10px 16px', background: 'var(--surface)', color: 'var(--danger)',
+  border: '1px solid var(--danger-br)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit', fontWeight: 600,
 } as const;

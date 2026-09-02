@@ -66,9 +66,9 @@ export default function ExamenPage() {
     const contestadas = respuestas.filter((r) => r >= 0).length;
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '8px 16px 60px' }}>
-        <div style={{ position: 'sticky', top: 0, background: '#f5f6f8', padding: '16px 0', borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
+        <div style={{ position: 'sticky', top: 'var(--header-h)', zIndex: 10, background: 'var(--bg)', padding: '16px 0', borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
           <h2 style={{ margin: '0 0 4px' }}>{exam.curso ?? 'Examen'}</h2>
-          <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>
+          <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14 }}>
             {exam.alumno} · {contestadas}/{exam.preguntas.length} respondidas
             {exam.tiempoLimiteMin && ` · ${exam.tiempoLimiteMin} min sugeridos`}
           </p>
@@ -78,7 +78,7 @@ export default function ExamenPage() {
 
         <div style={{ display: 'grid', gap: 18 }}>
           {exam.preguntas.map((q, qi) => (
-            <div key={q.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18 }}>
+            <div key={q.id} className="card" style={{ padding: 18 }}>
               <p style={{ margin: '0 0 12px', fontWeight: 600 }}>{qi + 1}. {q.enunciado}</p>
               <div style={{ display: 'grid', gap: 8 }}>
                 {q.opciones.map((o, oi) => {
@@ -86,8 +86,8 @@ export default function ExamenPage() {
                   return (
                     <label key={oi} style={{
                       display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
-                      border: `2px solid ${sel ? '#0f172a' : '#e2e8f0'}`, borderRadius: 10,
-                      background: sel ? '#f1f5f9' : '#fff', cursor: 'pointer', fontSize: 15,
+                      border: `2px solid ${sel ? 'var(--brand)' : 'var(--border)'}`, borderRadius: 10,
+                      background: sel ? 'var(--brand-050)' : 'var(--surface)', cursor: 'pointer', fontSize: 15,
                     }}>
                       <input
                         type="radio" name={`q${qi}`} checked={sel}
@@ -136,6 +136,6 @@ function Centro({ children }: { children: React.ReactNode }) {
   );
 }
 
-const bigInput = { padding: '14px 16px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 18, textAlign: 'center' as const };
-const bigBtn = { padding: '14px 20px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 10, fontSize: 17, fontWeight: 600, cursor: 'pointer' };
-const errorStyle = { background: '#fee2e2', color: '#b91c1c', padding: '10px 14px', borderRadius: 8, fontSize: 14 };
+const bigInput = { padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border-strong)', fontSize: 18, textAlign: 'center' as const, fontFamily: 'inherit', color: 'var(--text)' };
+const bigBtn = { padding: '14px 20px', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 12, fontSize: 17, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+const errorStyle = { background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-br)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: 14 };

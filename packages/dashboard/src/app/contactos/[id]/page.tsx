@@ -63,10 +63,10 @@ export default function ContactPage({ params }: { params: { id: string } }) {
 
   return (
     <div>
-      <Link href="/" style={{ color: '#2563eb' }}>← Volver</Link>
-      <h2 style={{ marginBottom: 4 }}>{contact?.full_name ?? contact?.phone ?? 'Conversación'}</h2>
+      <Link href="/">← Volver</Link>
+      <h1 style={{ margin: '10px 0 4px' }}>{contact?.full_name ?? contact?.phone ?? 'Conversación'}</h1>
       {contact && (
-        <p style={{ color: '#64748b', fontSize: 14, marginTop: 0 }}>
+        <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 0 }}>
           {contact.phone ?? '—'}
           {contact.dni && ` · DNI ${contact.dni}`}
           {contact.interest && ` · ${contact.interest}`}
@@ -85,17 +85,10 @@ export default function ContactPage({ params }: { params: { id: string } }) {
         <h3 style={{ fontSize: 16, margin: 0 }}>Conversación</h3>
         {contact && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{
-              background: contact.bot_paused ? '#ea580c' : '#16a34a', color: '#fff',
-              padding: '3px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600,
-            }}>
+            <span className={`badge ${contact.bot_paused ? 'badge-warning' : 'badge-success'}`}>
               {contact.bot_paused ? '⏸️ Atiende un operador' : '🤖 Responde el bot'}
             </span>
-            <button onClick={toggleBot} style={{
-              padding: '6px 14px', background: '#fff', color: '#334155',
-              border: '1px solid #cbd5e1', borderRadius: 8,
-              fontSize: 13, cursor: 'pointer',
-            }}>
+            <button onClick={toggleBot} className="btn btn-sm">
               {contact.bot_paused ? 'Devolver al bot' : 'Tomar conversación'}
             </button>
           </div>
@@ -108,8 +101,7 @@ export default function ContactPage({ params }: { params: { id: string } }) {
         </p>
       )}
 
-      <div style={{
-        background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+      <div className="card" style={{
         padding: 16, height: 420, overflowY: 'auto', display: 'flex',
         flexDirection: 'column', gap: 8,
       }}>
@@ -119,13 +111,13 @@ export default function ContactPage({ params }: { params: { id: string } }) {
             maxWidth: '75%',
           }}>
             <div style={{
-              background: m.direction === 'inbound' ? '#f1f5f9'
-                : m.sender === 'agent' ? '#dbeafe' : '#dcfce7',
+              background: m.direction === 'inbound' ? 'var(--surface-3)'
+                : m.sender === 'agent' ? 'var(--info-bg)' : 'var(--success-bg)',
               padding: '8px 12px', borderRadius: 10, fontSize: 14, whiteSpace: 'pre-wrap',
             }}>
               {m.body}
             </div>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 2 }}>
               {m.sender === 'bot' ? '🤖 bot' : m.sender === 'agent' ? '👤 operador' : ''}{' '}
               {new Date(m.created_at).toLocaleTimeString('es-AR')}
             </div>
@@ -135,24 +127,18 @@ export default function ContactPage({ params }: { params: { id: string } }) {
 
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
         <input
+          className="input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
           placeholder="Escribir un mensaje al alumno…"
-          style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid #cbd5e1' }}
+          style={{ flex: 1 }}
         />
-        <button
-          onClick={send}
-          disabled={sending}
-          style={{
-            padding: '10px 20px', background: '#16a34a', color: '#fff',
-            border: 'none', borderRadius: 8, cursor: 'pointer',
-          }}
-        >
+        <button onClick={send} disabled={sending} className="btn btn-success">
           {sending ? 'Enviando…' : 'Enviar'}
         </button>
       </div>
-      <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>
+      <p style={{ fontSize: 12, color: 'var(--muted-2)', marginTop: 6 }}>
         Nota: con la API oficial de WhatsApp, fuera de la ventana de 24 hs solo se
         pueden enviar plantillas aprobadas por Meta.
       </p>
