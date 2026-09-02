@@ -6,6 +6,7 @@ import {
   api, auth, UnauthorizedError,
   type AdminUser, type AdminRole, type SucursalInfo,
 } from '../../lib/api';
+import ConfigTabs from '../../components/ConfigTabs';
 
 /**
  * Gestor de usuarios del panel (solo admin). Permite crear operadores por
@@ -135,7 +136,7 @@ export default function UsuariosPage() {
     <div style={{ display: 'grid', gap: 26, maxWidth: 900 }}>
       <div className="page-head">
         <div>
-          <div className="eyebrow">Administración</div>
+          <div className="eyebrow">Configuración</div>
           <h1>Usuarios del panel</h1>
           <div className="sub">
             El <strong>admin</strong> ve todas las sucursales. Cada <strong>operador</strong> ve
@@ -143,6 +144,8 @@ export default function UsuariosPage() {
           </div>
         </div>
       </div>
+
+      <ConfigTabs />
 
       {notice && <div style={noticeStyle}>{notice}</div>}
       {error && <div style={errorStyle}>{error}</div>}
