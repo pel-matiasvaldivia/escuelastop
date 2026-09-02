@@ -206,7 +206,7 @@ export default function HomePage() {
                       e.sede ?? '—'
                     )}
                   </td>
-                  <td><PaymentCell e={e} busy={payBusyId === e.id} onComplete={() => completePay(e.id)} /></td>
+                  <td style={{ whiteSpace: 'nowrap', width: '1%' }}><PaymentCell e={e} busy={payBusyId === e.id} onComplete={() => completePay(e.id)} /></td>
                   <td><CohorteCell e={e} /></td>
                   <td><StatusBadge status={e.status} /></td>
                   <td style={{ color: 'var(--muted)', whiteSpace: 'nowrap', fontSize: 13 }}>

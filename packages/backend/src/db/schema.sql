@@ -376,3 +376,43 @@ ALTER TABLE enrollments
   ADD CONSTRAINT enrollments_status_check
   CHECK (status IN ('nuevo','contactado','inscripto','pagado','completado',
                     'cancelado','pendiente_verificacion','preinscripto'));
+
+-- ---------------------------------------------------------------------------
+-- CAJA — Flujo de caja por sucursal: apertura/cierre y movimientos.
+--
+-- Una SESIÓN de caja se abre con un saldo inicial en efectivo y se cierra
+-- contando el efectivo final (arqueo). Dentro de una sesión (o sueltos) se
+-- registran MOVIMIENTOS de ingreso/egreso, cada uno con el medio por el que
+-- entró/salió el dinero (efectivo, Mercado Pago, Pago Fácil, Rapipago, etc.).
+-- El operador ve/gestiona solo la caja de SU sucursal; el admin ve todas.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS caja_sesiones (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sede          TEXT,                                  -- sucursal de la caja
+  estado        TEXT NOT NULL DEFAULT 'abierta' CHECK (estado IN ('abierta','cerrada')),
+  saldo_inicial NUMERIC(12,2) NOT NULL DEFAULT 0,      -- efectivo inicial declarado
+  saldo_final   NUMERIC(12,2),                         -- efectivo contado al cerrar (arqueo)
+  abierta_por   TEXT NOT NULL,
+  abierta_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  cerrada_por   TEXT,
+  cerrada_at    TIMESTAMPTZ,
+  notas         TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_caja_sesiones_sede ON caja_sesiones(sede, estado);
+
+CREATE TABLE IF NOT EXISTS caja_movimientos (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sesion_id      UUID REFERENCES caja_sesiones(id) ON DELETE SET NULL,
+  sede           TEXT,
+  tipo           TEXT NOT NULL CHECK (tipo IN ('ingreso','egreso')),
+  medio          TEXT NOT NULL
+                 CHECK (medio IN ('efectivo','mercadopago','pagofacil','rapipago',
+                                  'transferencia','tarjeta','otro')),
+  monto          NUMERIC(12,2) NOT NULL CHECK (monto >= 0),
+  concepto       TEXT NOT NULL,
+  enrollment_id  UUID REFERENCES enrollments(id) ON DELETE SET NULL,  -- si vino de una seña
+  registrado_por TEXT NOT NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_caja_mov_sesion ON caja_movimientos(sesion_id);
+CREATE INDEX IF NOT EXISTS idx_caja_mov_sede ON caja_movimientos(sede, created_at);
