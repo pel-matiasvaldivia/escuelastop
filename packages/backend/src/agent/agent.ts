@@ -4,8 +4,7 @@ import { KNOWLEDGE_BASE } from './knowledge.js';
 import { COURSES, getCourse } from './catalog.js';
 import { createEnrollment } from '../services/enrollments.js';
 import { updateContact } from '../services/contacts.js';
-
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+import { getEffectiveAI } from '../services/settings.js';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -142,10 +141,17 @@ function isObviouslyOutOfScope(text: string): boolean {
 }
 
 export async function generateReply(history: ChatTurn[], contactId: string): Promise<string> {
-  if (!config.anthropic.apiKey) {
-    return 'El asistente no está configurado todavía (falta ANTHROPIC_API_KEY). ' +
+  // Config del agente: prioridad a lo cargado en "Configuración", luego el .env.
+  const ai = await getEffectiveAI();
+  if (!ai.apiKey) {
+    return 'El asistente no está configurado todavía (falta la API key del agente). ' +
       'Por favor escribinos a escuelastop@gmail.com.';
   }
+  const client = new Anthropic({ apiKey: ai.apiKey });
+  // Instrucciones adicionales que la empresa cargó desde el panel (opcional).
+  const system = ai.instrucciones
+    ? `${SYSTEM_PROMPT}\n\nInstrucciones adicionales de la empresa (respetá igualmente la REGLA DE ALCANCE):\n${ai.instrucciones}`
+    : SYSTEM_PROMPT;
 
   // Corte temprano sin llamar a la API para lo evidentemente fuera de tema.
   const lastUser = [...history].reverse().find((t) => t.role === 'user');
@@ -160,9 +166,9 @@ export async function generateReply(history: ChatTurn[], contactId: string): Pro
   // Hasta 3 vueltas para permitir una llamada a herramienta y su respuesta.
   for (let i = 0; i < 3; i++) {
     const response = await client.messages.create({
-      model: config.anthropic.model,
+      model: ai.model,
       max_tokens: 700,
-      system: SYSTEM_PROMPT,
+      system,
       tools,
       messages,
     });

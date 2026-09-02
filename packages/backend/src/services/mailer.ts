@@ -1,36 +1,45 @@
 import nodemailer, { type Transporter } from 'nodemailer';
-import { config } from '../config.js';
+import { getEffectiveMail, type EffectiveMail } from './settings.js';
 
 /**
  * Envío de mails de notificación por SMTP (nodemailer).
  *
- * Es OPCIONAL: si no hay SMTP_HOST configurado, `sendMail` no hace nada (no-op)
- * y el sistema sigue funcionando solo con las notificaciones de WhatsApp. Así el
- * mecanismo de matriculación/notificación nunca se rompe por falta de mail.
+ * La configuración sale de la pestaña "Configuración" (con prioridad) o del
+ * `.env`. Es OPCIONAL: si no hay host SMTP configurado, `sendMail` no hace nada
+ * (no-op) y el sistema sigue funcionando solo con las notificaciones de WhatsApp.
+ *
+ * El transporte se cachea por combinación de credenciales: si el admin cambia la
+ * config, en el próximo envío se detecta el cambio y se recrea el transporte.
  */
 
-let transporter: Transporter | null | undefined;
+let cached: { key: string; tx: Transporter } | null = null;
 
-/** Crea (una sola vez) el transporte SMTP, o null si no está configurado. */
-function getTransport(): Transporter | null {
-  if (transporter !== undefined) return transporter;
-  if (!config.mail.host) {
-    transporter = null;
-    console.log('ℹ️  Mail deshabilitado (falta SMTP_HOST): solo se notifica por WhatsApp.');
-    return transporter;
+function mailKey(m: EffectiveMail): string {
+  return [m.host, m.port, m.secure, m.user, m.pass, m.from].join('|');
+}
+
+/** Crea/reusa el transporte SMTP según la config efectiva, o null si no hay host. */
+async function getTransport(): Promise<{ tx: Transporter; from: string } | null> {
+  const m = await getEffectiveMail();
+  if (!m.host) return null;
+  const key = mailKey(m);
+  if (!cached || cached.key !== key) {
+    cached = {
+      key,
+      tx: nodemailer.createTransport({
+        host: m.host,
+        port: m.port,
+        secure: m.secure,
+        auth: m.user ? { user: m.user, pass: m.pass } : undefined,
+      }),
+    };
   }
-  transporter = nodemailer.createTransport({
-    host: config.mail.host,
-    port: config.mail.port,
-    secure: config.mail.secure,
-    auth: config.mail.user ? { user: config.mail.user, pass: config.mail.pass } : undefined,
-  });
-  return transporter;
+  return { tx: cached.tx, from: m.from };
 }
 
 /** ¿Está configurado el envío de mails? (para logs / diagnósticos). */
-export function mailEnabled(): boolean {
-  return !!config.mail.host;
+export async function mailEnabled(): Promise<boolean> {
+  return !!(await getEffectiveMail()).host;
 }
 
 export interface MailInput {
@@ -49,11 +58,11 @@ export interface MailInput {
 export async function sendMail(input: MailInput): Promise<boolean> {
   const to = input.to?.trim();
   if (!to) return false;
-  const tx = getTransport();
-  if (!tx) return false;
+  const t = await getTransport();
+  if (!t) return false;
   try {
-    await tx.sendMail({
-      from: config.mail.from,
+    await t.tx.sendMail({
+      from: t.from,
       to,
       subject: input.subject,
       text: input.text,
@@ -64,4 +73,16 @@ export async function sendMail(input: MailInput): Promise<boolean> {
     console.error(`No se pudo enviar el mail a ${to}:`, err);
     return false;
   }
+}
+
+/** Envía un mail de PRUEBA para validar la configuración SMTP. Lanza si falla. */
+export async function sendTestMail(to: string): Promise<void> {
+  const t = await getTransport();
+  if (!t) throw new Error('No hay servidor SMTP configurado.');
+  await t.tx.sendMail({
+    from: t.from,
+    to,
+    subject: 'Prueba de configuración — Escuela STOP',
+    text: 'Este es un mail de prueba. Si lo recibiste, el servidor SMTP quedó bien configurado. ✅',
+  });
 }

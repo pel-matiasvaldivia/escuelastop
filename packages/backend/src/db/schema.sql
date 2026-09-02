@@ -336,6 +336,38 @@ ALTER TABLE enrollments
 ALTER TABLE enrollments
   ADD COLUMN IF NOT EXISTS pago_completo_at TIMESTAMPTZ;
 
+-- ---------------------------------------------------------------------------
+-- Configuración de la aplicación (una sola fila). La cargan los administradores
+-- desde la pestaña "Configuración": datos de la empresa, servidor SMTP para las
+-- notificaciones y credenciales del agente de IA. Los valores acá tienen
+-- prioridad sobre las variables de entorno.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS app_settings (
+  singleton       BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
+  -- Empresa
+  empresa_nombre  TEXT,
+  cuit            TEXT,
+  domicilio       TEXT,
+  email           TEXT,
+  telefono        TEXT,
+  logo_path       TEXT,           -- ruta del archivo de logo subido
+  -- Notificaciones por mail (SMTP)
+  smtp_host       TEXT,
+  smtp_port       INT,
+  smtp_secure     BOOLEAN,
+  smtp_user       TEXT,
+  smtp_pass       TEXT,           -- secreto: nunca se devuelve al frontend
+  mail_from       TEXT,
+  -- Agente de IA
+  ai_api_key      TEXT,           -- secreto: nunca se devuelve al frontend
+  ai_model        TEXT,
+  ai_instrucciones TEXT,          -- instrucciones adicionales para el agente
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by      TEXT
+);
+-- Garantiza que exista la fila única.
+INSERT INTO app_settings (singleton) VALUES (TRUE) ON CONFLICT (singleton) DO NOTHING;
+
 -- Estado 'preinscripto': el alumno generó un cupón de pago en efectivo
 -- (Rapipago / Pago Fácil) y todavía no lo abonó. Cuando el pago se acredita
 -- (webhook), pasa a 'pagado' y sigue el flujo normal.

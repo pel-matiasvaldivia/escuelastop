@@ -274,6 +274,35 @@ export interface AdminUser {
   created_at?: string;
 }
 
+// ------------------------------ Configuración ------------------------------
+
+export interface AppSettings {
+  empresa_nombre: string | null;
+  cuit: string | null;
+  domicilio: string | null;
+  email: string | null;
+  telefono: string | null;
+  logo_path: string | null;
+  smtp_host: string | null;
+  smtp_port: number | null;
+  smtp_secure: boolean | null;
+  smtp_user: string | null;
+  mail_from: string | null;
+  smtp_pass_set: boolean;
+  ai_model: string | null;
+  ai_instrucciones: string | null;
+  ai_api_key_set: boolean;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface SettingsUpdate {
+  empresa_nombre?: string; cuit?: string; domicilio?: string; email?: string; telefono?: string;
+  smtp_host?: string; smtp_port?: number | null; smtp_secure?: boolean;
+  smtp_user?: string; smtp_pass?: string; mail_from?: string;
+  ai_api_key?: string; ai_model?: string; ai_instrucciones?: string;
+}
+
 export const auth = {
   getToken(): string | null {
     if (typeof window === 'undefined') return null;
@@ -413,6 +442,23 @@ export const api = {
     return user;
   },
 
+  // --- Configuración (solo admin) ---
+  settings: () => get<AppSettings>('/settings'),
+  updateSettings: (data: SettingsUpdate) => send<AppSettings>('/settings', 'PATCH', data),
+  async uploadLogo(file: File): Promise<{ ok: boolean; logo_path: string }> {
+    const fd = new FormData();
+    fd.append('logo', file);
+    const res = await fetch(`${API_URL}/api/settings/logo`, {
+      method: 'POST', headers: authHeaders(), body: fd,
+    });
+    handle401(res);
+    if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo subir el logo');
+    return res.json();
+  },
+  testMail: (to?: string) => send<{ ok: boolean; to: string }>('/settings/test-mail', 'POST', { to }),
+  /** URL del logo con cache-bust opcional (ts). */
+  logoUrl: (ts?: string) => `${API_URL}/api/settings/logo${ts ? `?t=${encodeURIComponent(ts)}` : ''}`,
+
   // --- Gestor de usuarios (solo admin) ---
   users: () => get<AdminUser[]>('/admin/users'),
 
@@ -467,6 +513,11 @@ export const api = {
   enrollments: () => get<Enrollment[]>('/enrollments'),
   messages: (contactId: string) => get<Message[]>(`/contacts/${contactId}/messages`),
   catalog: () => get<Course[]>('/catalog'),
+  /** Branding público (nombre y logo de la empresa) para el formulario del alumno. */
+  branding: () => get<{
+    empresa_nombre: string | null; email: string | null;
+    telefono: string | null; domicilio: string | null; logo_path: string | null;
+  }>('/public/branding'),
   /** Sucursales operativas (las inactivas no se ofrecen). */
   sucursales: () => get<SucursalInfo[]>('/catalog/sucursales'),
   enrollmentByToken: (token: string) => get<Enrollment>(`/public/enrollment/${token}`),
