@@ -46,7 +46,29 @@ export interface Enrollment {
   /** La seña es un anticipo; pago_completo indica si se saldó el total. */
   pago_completo?: boolean;
   pago_completo_at?: string | null;
+  /** Datos del alumno (contacto). */
+  alumno_nombre?: string | null;
+  alumno_dni?: string | null;
+  alumno_telefono?: string | null;
+  created_at?: string;
   updated_at: string;
+}
+
+export interface EnrollmentQuery {
+  q?: string;
+  course?: string;
+  desde?: string;
+  hasta?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface EnrollmentStats {
+  total: number;
+  preinscriptos: number;
+  pendiente_pago: number;
+  completos: number;
 }
 
 /** Curso ABIERTO que el alumno puede elegir en el formulario (con su cupo). */
@@ -510,7 +532,16 @@ export const api = {
   },
 
   contacts: () => get<Contact[]>('/contacts'),
-  enrollments: () => get<Enrollment[]>('/enrollments'),
+  /** Bandeja de inscripciones con búsqueda, filtros y paginación. */
+  enrollments: (params: EnrollmentQuery = {}) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== null && String(v) !== '') qs.set(k, String(v));
+    }
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return get<{ rows: Enrollment[]; total: number }>(`/enrollments${suffix}`);
+  },
+  enrollmentStats: () => get<EnrollmentStats>('/enrollments/stats'),
   messages: (contactId: string) => get<Message[]>(`/contacts/${contactId}/messages`),
   catalog: () => get<Course[]>('/catalog'),
   /** Branding público (nombre y logo de la empresa) para el formulario del alumno. */

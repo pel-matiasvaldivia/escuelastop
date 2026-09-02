@@ -41,6 +41,29 @@ export interface EnrollmentView extends Enrollment {
   curso_fecha_inicio: string | null;
   curso_cupo_maximo: number | null;
   curso_activos: number | null;
+  /** Datos del alumno (contacto) para la bandeja. */
+  alumno_nombre: string | null;
+  alumno_dni: string | null;
+  alumno_telefono: string | null;
+}
+
+export interface EnrollmentListOpts {
+  status?: EnrollmentStatus;
+  sucursal?: string | null;
+  /** Búsqueda por nombre, DNI o curso. */
+  q?: string;
+  /** Filtro por nombre de curso exacto (del catálogo). */
+  course?: string;
+  /** Rango por fecha de inscripción (created_at), en formato YYYY-MM-DD. */
+  desde?: string;
+  hasta?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface EnrollmentListResult {
+  rows: EnrollmentView[];
+  total: number;
 }
 
 export async function createEnrollment(
@@ -65,8 +88,8 @@ export async function createEnrollment(
  *   y ve todo.
  */
 export async function listEnrollments(
-  opts: { status?: EnrollmentStatus; sucursal?: string | null } = {},
-): Promise<EnrollmentView[]> {
+  opts: EnrollmentListOpts = {},
+): Promise<EnrollmentListResult> {
   const conds: string[] = [];
   const values: unknown[] = [];
   if (opts.status) {
@@ -77,24 +100,56 @@ export async function listEnrollments(
     values.push(opts.sucursal);
     conds.push(`e.sede = $${values.length}`);
   }
+  if (opts.q && opts.q.trim()) {
+    values.push(`%${opts.q.trim()}%`);
+    const i = values.length;
+    conds.push(`(c.full_name ILIKE $${i} OR c.dni ILIKE $${i} OR c.phone ILIKE $${i} OR e.course ILIKE $${i})`);
+  }
+  if (opts.course && opts.course.trim()) {
+    values.push(opts.course.trim());
+    conds.push(`e.course = $${values.length}`);
+  }
+  if (opts.desde) {
+    values.push(opts.desde);
+    conds.push(`e.created_at >= $${values.length}::date`);
+  }
+  if (opts.hasta) {
+    values.push(opts.hasta);
+    // inclusive del día "hasta": < día siguiente.
+    conds.push(`e.created_at < ($${values.length}::date + INTERVAL '1 day')`);
+  }
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-  const res = await query<EnrollmentView & { curso_activos: string | null }>(
+
+  const limit = Math.min(Math.max(opts.limit ?? 25, 1), 200);
+  const offset = Math.max(opts.offset ?? 0, 0);
+  values.push(limit); const limIdx = values.length;
+  values.push(offset); const offIdx = values.length;
+
+  const res = await query<EnrollmentView & { curso_activos: string | null; total_count: string }>(
     `SELECT e.*,
+            c.full_name     AS alumno_nombre,
+            c.dni           AS alumno_dni,
+            c.phone         AS alumno_telefono,
             tc.nombre       AS curso_nombre,
             tc.fecha_inicio AS curso_fecha_inicio,
             tc.cupo_maximo  AS curso_cupo_maximo,
             (SELECT COUNT(*) FROM course_students cs
-              WHERE cs.training_course_id = tc.id AND cs.estado <> 'baja') AS curso_activos
+              WHERE cs.training_course_id = tc.id AND cs.estado <> 'baja') AS curso_activos,
+            COUNT(*) OVER() AS total_count
        FROM enrollments e
+       LEFT JOIN contacts c ON c.id = e.contact_id
        LEFT JOIN training_courses tc ON tc.id = e.training_course_id
        ${where}
-      ORDER BY e.updated_at DESC`,
+      ORDER BY e.updated_at DESC
+      LIMIT $${limIdx} OFFSET $${offIdx}`,
     values,
   );
-  return res.rows.map((r) => ({
+  const total = res.rows[0] ? Number(res.rows[0].total_count) : 0;
+  const rows = res.rows.map((r) => ({
     ...r,
     curso_activos: r.curso_activos == null ? null : Number(r.curso_activos),
   }));
+  return { rows, total };
 }
 
 /**
@@ -138,6 +193,27 @@ export async function setEnrollmentTrainingCourse(
     [id, trainingCourseId, sede, notes],
   );
   return res.rows[0] ?? null;
+}
+
+/** Totales para los KPIs de la bandeja (scopeados por sucursal; sin paginar). */
+export async function enrollmentStats(
+  sucursal?: string | null,
+): Promise<{ total: number; preinscriptos: number; pendiente_pago: number; completos: number }> {
+  const values: unknown[] = [];
+  let where = '';
+  if (sucursal !== undefined && sucursal !== null) {
+    values.push(sucursal);
+    where = 'WHERE sede = $1';
+  }
+  const res = await query<{ total: number; preinscriptos: number; pendiente_pago: number; completos: number }>(
+    `SELECT COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE status = 'preinscripto')::int AS preinscriptos,
+            COUNT(*) FILTER (WHERE payment_status = 'aprobado' AND NOT pago_completo)::int AS pendiente_pago,
+            COUNT(*) FILTER (WHERE pago_completo)::int AS completos
+       FROM enrollments ${where}`,
+    values,
+  );
+  return res.rows[0];
 }
 
 /** ¿La inscripción pertenece a esta sucursal? (autorización de operadores). */
