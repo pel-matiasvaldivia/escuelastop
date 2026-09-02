@@ -281,6 +281,75 @@ export type CertVerification =
   | { valido: true; anulado: boolean; serial: string; datos: Record<string, unknown>; emitido_at: string }
   | { valido: false };
 
+// ------------------------------ Caja ---------------------------------------
+
+export type CajaTipo = 'ingreso' | 'egreso';
+export type CajaMedio =
+  | 'efectivo' | 'mercadopago' | 'pagofacil' | 'rapipago'
+  | 'transferencia' | 'tarjeta' | 'otro';
+
+/** Etiquetas legibles de los medios de pago. */
+export const CAJA_MEDIO_LABEL: Record<CajaMedio, string> = {
+  efectivo: 'Efectivo',
+  mercadopago: 'Mercado Pago',
+  pagofacil: 'Pago Fácil',
+  rapipago: 'Rapipago',
+  transferencia: 'Transferencia',
+  tarjeta: 'Tarjeta',
+  otro: 'Otro',
+};
+export const CAJA_MEDIOS: CajaMedio[] = [
+  'efectivo', 'mercadopago', 'pagofacil', 'rapipago', 'transferencia', 'tarjeta', 'otro',
+];
+
+export interface CajaSesion {
+  id: string;
+  sede: string | null;
+  estado: 'abierta' | 'cerrada';
+  saldo_inicial: number;
+  saldo_final: number | null;
+  abierta_por: string;
+  abierta_at: string;
+  cerrada_por: string | null;
+  cerrada_at: string | null;
+  notas: string | null;
+}
+
+export interface CajaSesionResumen extends CajaSesion {
+  ingresos: number;
+  egresos: number;
+}
+
+export interface CajaMovimiento {
+  id: string;
+  sesion_id: string | null;
+  sede: string | null;
+  tipo: CajaTipo;
+  medio: CajaMedio;
+  monto: number;
+  concepto: string;
+  enrollment_id: string | null;
+  registrado_por: string;
+  created_at: string;
+}
+
+export interface CajaResumen {
+  ingresos: number;
+  egresos: number;
+  neto: number;
+  porMedio: { medio: CajaMedio; ingresos: number; egresos: number; neto: number; cantidad: number }[];
+}
+
+export interface CajaMovQuery {
+  tipo?: CajaTipo;
+  medio?: CajaMedio;
+  sesionId?: string;
+  desde?: string;
+  hasta?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 // ------------------------------ Sesión -------------------------------------
 const TOKEN_KEY = 'stop_token';
 const USER_KEY = 'stop_user';
@@ -828,4 +897,34 @@ export const api = {
 
   // -- Verificación pública del certificado (QR) --
   verifyCertificate: (codigo: string) => get<CertVerification>(`/public/verificar/${codigo}`),
+
+  // ============================ CAJA ============================
+  /** Estado actual: sesión abierta (o null) + resumen de esa sesión. */
+  cajaSession: () => get<{ sesion: CajaSesion | null; resumen: CajaResumen }>('/caja/session'),
+  openCaja: (data: { saldoInicial: number; sede?: string; notas?: string }) =>
+    send<CajaSesion>('/caja/session/open', 'POST', data),
+  closeCaja: (id: string, data: { saldoFinal: number; notas?: string }) =>
+    send<CajaSesion>(`/caja/session/${id}/close`, 'POST', data),
+  cajaSessions: () => get<CajaSesionResumen[]>('/caja/sessions'),
+  addMovimiento: (data: {
+    tipo: CajaTipo; medio: CajaMedio; monto: number; concepto: string; sesionId?: string;
+  }) => send<CajaMovimiento>('/caja/movimientos', 'POST', data),
+  /** Movimientos con filtros + paginación. */
+  cajaMovimientos: (params: CajaMovQuery = {}) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== null && String(v) !== '') qs.set(k, String(v));
+    }
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return get<{ rows: CajaMovimiento[]; total: number }>(`/caja/movimientos${suffix}`);
+  },
+  /** Resumen (reporte) del flujo de caja en un rango. */
+  cajaResumen: (params: { desde?: string; hasta?: string } = {}) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v) qs.set(k, String(v));
+    }
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return get<CajaResumen>(`/caja/resumen${suffix}`);
+  },
 };

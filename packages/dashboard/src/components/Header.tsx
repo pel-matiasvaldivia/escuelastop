@@ -51,6 +51,7 @@ export default function Header() {
               active={pathname.startsWith('/conversaciones') || pathname.startsWith('/contactos')} />
             <Tab href="/" label="Inscripciones"
               active={pathname === '/' || pathname.startsWith('/inscripciones')} />
+            <Tab href="/caja" label="Caja" active={pathname.startsWith('/caja')} />
             <Tab href="/capacitaciones" label="Capacitaciones" active={pathname.startsWith('/capacitaciones')} />
             {isAdmin && (
               <Tab href="/configuracion" label="Configuración"
