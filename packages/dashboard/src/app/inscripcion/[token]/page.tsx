@@ -42,6 +42,7 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
   const { token } = params;
   const [courses, setCourses] = useState<Course[]>([]);
   const [sucursales, setSucursales] = useState<SucursalInfo[]>([]);
+  const [branding, setBranding] = useState<{ empresa_nombre: string | null; logo_path: string | null } | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<Record<string, File>>({});
@@ -69,6 +70,7 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
     (async () => {
       try {
         api.sucursales().then(setSucursales).catch(() => setSucursales([]));
+        api.branding().then(setBranding).catch(() => setBranding(null));
         const cat = await api.catalog();
         setCourses(cat);
         try {
@@ -256,11 +258,16 @@ export default function EnrollmentForm({ params }: { params: { token: string } }
   return (
     <div style={card}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 4 }}>
-        <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#ef4444,#b91c1c)', boxShadow: '0 4px 12px -3px rgba(239,68,68,.5)' }} aria-hidden>
-          <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#fff', boxShadow: 'inset 0 0 0 3px #b91c1c' }} />
-        </span>
+        {branding?.logo_path ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={api.logoUrl(branding.logo_path)} alt="Logo" style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'contain', background: '#fff', border: '1px solid var(--border)' }} />
+        ) : (
+          <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#ef4444,#b91c1c)', boxShadow: '0 4px 12px -3px rgba(239,68,68,.5)' }} aria-hidden>
+            <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#fff', boxShadow: 'inset 0 0 0 3px #b91c1c' }} />
+          </span>
+        )}
         <div>
-          <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.01em' }}>Escuela de Manejo STOP</div>
+          <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.01em' }}>{branding?.empresa_nombre || 'Escuela de Manejo STOP'}</div>
           <div style={{ color: 'var(--muted)', fontSize: 13 }}>Formulario de inscripción</div>
         </div>
       </div>

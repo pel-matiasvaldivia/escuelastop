@@ -69,11 +69,12 @@ export default function WhatsAppPage() {
 
   return (
     <div style={{ display: 'grid', gap: 20, maxWidth: 640 }}>
-      <div>
-        <h2 style={{ margin: 0 }}>Vincular WhatsApp</h2>
-        <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>
-          Conectá el número desde el que responde el agente a los alumnos.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Canal</div>
+          <h1>Vincular WhatsApp</h1>
+          <div className="sub">Conectá el número desde el que responde el agente a los alumnos.</div>
+        </div>
       </div>
 
       <div style={card}>
@@ -167,40 +168,33 @@ export default function WhatsAppPage() {
 }
 
 function StateBadge({ state }: { state: string }) {
-  const map: Record<string, { label: string; color: string }> = {
-    apagado: { label: 'Desconectado', color: '#64748b' },
-    iniciando: { label: 'Iniciando…', color: '#0891b2' },
-    qr: { label: 'Esperando escaneo', color: '#ea580c' },
-    conectado: { label: 'Conectado', color: '#16a34a' },
-    error: { label: 'Error', color: '#dc2626' },
+  const map: Record<string, { label: string; cls: string }> = {
+    apagado: { label: 'Desconectado', cls: 'badge' },
+    iniciando: { label: 'Iniciando…', cls: 'badge-info' },
+    qr: { label: 'Esperando escaneo', cls: 'badge-warning' },
+    conectado: { label: 'Conectado', cls: 'badge-success' },
+    error: { label: 'Error', cls: 'badge-danger' },
   };
   const s = map[state] ?? map.apagado;
-  return (
-    <span style={{
-      background: s.color, color: '#fff', padding: '3px 12px',
-      borderRadius: 12, fontSize: 12, fontWeight: 600,
-    }}>
-      {s.label}
-    </span>
-  );
+  return <span className={`badge ${s.cls}`}>{s.label}</span>;
 }
 
 const card = {
-  background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 24,
+  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 24, boxShadow: 'var(--shadow-sm)',
 } as const;
 const instructions = {
-  textAlign: 'left' as const, fontSize: 14, color: '#334155',
+  textAlign: 'left' as const, fontSize: 14, color: 'var(--text-2)',
   margin: '18px auto 10px', maxWidth: 380, lineHeight: 1.7,
 };
 const errorBox = {
-  background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: 10,
-  fontSize: 12, color: '#991b1b', whiteSpace: 'pre-wrap' as const, overflowX: 'auto' as const,
+  background: 'var(--danger-bg)', border: '1px solid var(--danger-br)', borderRadius: 'var(--radius-sm)', padding: 10,
+  fontSize: 12, color: 'var(--danger)', whiteSpace: 'pre-wrap' as const, overflowX: 'auto' as const,
 };
 const primaryBtn = {
-  padding: '10px 20px', background: '#0f172a', color: '#fff', border: 'none',
-  borderRadius: 8, cursor: 'pointer', fontSize: 15, fontWeight: 600,
+  padding: '11px 20px', background: 'var(--brand)', color: '#fff', border: '1px solid var(--brand)',
+  borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 15, fontWeight: 600, fontFamily: 'inherit',
 } as const;
 const dangerBtn = {
-  padding: '10px 20px', background: '#fff', color: '#dc2626',
-  border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 15,
+  padding: '11px 20px', background: 'var(--surface)', color: 'var(--danger)',
+  border: '1px solid var(--danger-br)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 15, fontFamily: 'inherit', fontWeight: 600,
 } as const;

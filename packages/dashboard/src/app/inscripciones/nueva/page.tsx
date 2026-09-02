@@ -84,14 +84,14 @@ export default function NuevaInscripcionPage() {
   if (result) {
     return (
       <div style={{ maxWidth: 620 }}>
-        <h2>✅ Inscripción creada</h2>
-        <p style={{ color: '#475569' }}>
+        <h1 style={{ marginTop: 0 }}>✅ Inscripción creada</h1>
+        <p style={{ color: 'var(--text-2)' }}>
           Pasale este link al alumno para que complete sus datos y suba la
           documentación (DNI, licencia):
         </p>
         <div style={{
-          display: 'flex', gap: 8, alignItems: 'center', background: '#f8fafc',
-          border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, marginBottom: 16,
+          display: 'flex', gap: 8, alignItems: 'center', background: 'var(--surface-2)',
+          border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 12, marginBottom: 16,
         }}>
           <code style={{ flex: 1, fontSize: 13, wordBreak: 'break-all' }}>
             {result.formUrl}
@@ -130,14 +130,13 @@ export default function NuevaInscripcionPage() {
 
   return (
     <div style={{ maxWidth: 620 }}>
-      <Link href="/" style={{ color: '#2563eb', fontSize: 14 }}>← Volver</Link>
-      <h2 style={{ marginBottom: 4 }}>Nueva inscripción</h2>
-      <p style={{ color: '#64748b', fontSize: 14, marginTop: 0 }}>
+      <Link href="/">← Volver</Link>
+      <h1 style={{ margin: '10px 0 4px' }}>Nueva inscripción</h1>
+      <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 0, marginBottom: 18 }}>
         Para alumnos que se contactaron por teléfono o vinieron a la sucursal.
       </p>
 
-      <form onSubmit={onSubmit} style={{
-        background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
+      <form onSubmit={onSubmit} className="card" style={{
         padding: 24, display: 'grid', gap: 14,
       }}>
         <Field label="Nombre y apellido *">
@@ -236,16 +235,16 @@ function Field({ label, hint, children }: {
 }
 
 const input = {
-  padding: 10, borderRadius: 8, border: '1px solid #cbd5e1',
+  padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)',
   fontSize: 15, width: '100%', boxSizing: 'border-box' as const,
-  fontFamily: 'inherit',
+  fontFamily: 'inherit', color: 'var(--text)',
 };
 const primaryBtn = {
-  padding: '11px 20px', background: '#0f172a', color: '#fff', border: 'none',
-  borderRadius: 8, cursor: 'pointer', fontSize: 15, fontWeight: 600,
-  display: 'inline-block', textAlign: 'center' as const,
+  padding: '11px 20px', background: 'var(--brand)', color: '#fff', border: '1px solid var(--brand)',
+  borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 15, fontWeight: 600,
+  display: 'inline-block', textAlign: 'center' as const, fontFamily: 'inherit',
 } as const;
 const secondaryBtn = {
-  padding: '11px 20px', background: '#fff', color: '#334155',
-  border: '1px solid #cbd5e1', borderRadius: 8, cursor: 'pointer', fontSize: 15,
+  padding: '11px 20px', background: 'var(--surface)', color: 'var(--text-2)',
+  border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 15, fontFamily: 'inherit', fontWeight: 600,
 } as const;

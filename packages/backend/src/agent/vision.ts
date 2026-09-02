@@ -1,8 +1,6 @@
 import { readFileSync } from 'node:fs';
 import Anthropic from '@anthropic-ai/sdk';
-import { config } from '../config.js';
-
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+import { getEffectiveAI } from '../services/settings.js';
 
 type SupportedMime = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
 function normalizeMime(mime?: string): SupportedMime {
@@ -19,11 +17,13 @@ function normalizeMime(mime?: string): SupportedMime {
 export async function extractLicenseExpiry(
   imagePath: string, mimeType?: string,
 ): Promise<string | null> {
-  if (!config.anthropic.apiKey) return null;
+  const ai = await getEffectiveAI();
+  if (!ai.apiKey) return null;
   try {
+    const client = new Anthropic({ apiKey: ai.apiKey });
     const base64 = readFileSync(imagePath).toString('base64');
     const response = await client.messages.create({
-      model: config.anthropic.model,
+      model: ai.model,
       max_tokens: 100,
       messages: [{
         role: 'user',

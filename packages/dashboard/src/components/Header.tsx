@@ -52,6 +52,7 @@ export default function Header() {
             <Tab href="/whatsapp" label="WhatsApp" active={pathname === '/whatsapp'} />
             <Tab href="/como-funciona" label="Cómo funciona" active={pathname === '/como-funciona'} />
             {isAdmin && <Tab href="/usuarios" label="Usuarios" active={pathname === '/usuarios'} />}
+            {isAdmin && <Tab href="/configuracion" label="Configuración" active={pathname === '/configuracion'} />}
           </nav>
         )}
 

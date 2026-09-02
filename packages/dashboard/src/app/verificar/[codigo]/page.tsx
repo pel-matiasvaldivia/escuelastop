@@ -40,7 +40,7 @@ export default function VerificarPage() {
   const d = data.datos as Record<string, string | number | null>;
   return (
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '24px 16px' }}>
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden' }}>
+      <div className="card" style={{ borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
         <div style={{ background: data.anulado ? '#b91c1c' : '#16a34a', color: '#fff', padding: '20px 24px' }}>
           <div style={{ fontSize: 40 }}>{data.anulado ? '⚠️' : '✅'}</div>
           <h1 style={{ margin: '6px 0 2px', fontSize: 22 }}>
@@ -70,8 +70,8 @@ export default function VerificarPage() {
 
 function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
-      <span style={{ color: '#64748b', fontSize: 14 }}>{k}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+      <span style={{ color: 'var(--muted)', fontSize: 14 }}>{k}</span>
       <span style={{ fontWeight: 600, fontSize: 14, fontFamily: mono ? 'monospace' : undefined, textAlign: 'right' }}>{v}</span>
     </div>
   );

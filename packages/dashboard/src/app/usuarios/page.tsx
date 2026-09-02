@@ -129,17 +129,20 @@ export default function UsuariosPage() {
     }
   }
 
-  if (loading) return <p style={{ color: '#64748b' }}>Cargando…</p>;
+  if (loading) return <div className="empty"><span className="spinner" /> <span style={{ marginLeft: 8 }}>Cargando…</span></div>;
 
   return (
-    <div style={{ display: 'grid', gap: 28, maxWidth: 900 }}>
-      <section>
-        <h2 style={{ margin: '0 0 4px' }}>Usuarios del panel</h2>
-        <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>
-          El <strong>admin</strong> ve todas las sucursales. Cada <strong>operador</strong> ve
-          solo las inscripciones ya cerradas de su sucursal.
-        </p>
-      </section>
+    <div style={{ display: 'grid', gap: 26, maxWidth: 900 }}>
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Administración</div>
+          <h1>Usuarios del panel</h1>
+          <div className="sub">
+            El <strong>admin</strong> ve todas las sucursales. Cada <strong>operador</strong> ve
+            solo las inscripciones cerradas de su sucursal.
+          </div>
+        </div>
+      </div>
 
       {notice && <div style={noticeStyle}>{notice}</div>}
       {error && <div style={errorStyle}>{error}</div>}
@@ -256,27 +259,27 @@ export default function UsuariosPage() {
   );
 }
 
-const cardStyle = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 };
-const fieldStyle = { display: 'flex', flexDirection: 'column' as const, gap: 4, flex: '1 1 220px' };
-const labelStyle = { fontSize: 13, color: '#475569', fontWeight: 600 };
+const cardStyle = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 20, boxShadow: 'var(--shadow-sm)' };
+const fieldStyle = { display: 'flex', flexDirection: 'column' as const, gap: 6, flex: '1 1 220px' };
+const labelStyle = { fontSize: 12.5, color: 'var(--text-2)', fontWeight: 600 };
 const inputStyle = {
-  padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, width: '100%',
+  padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontSize: 14, width: '100%', fontFamily: 'inherit', color: 'var(--text)',
 };
 const primaryBtn = {
-  padding: '9px 18px', background: '#0f172a', color: '#fff', border: 'none',
-  borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+  padding: '10px 18px', background: 'var(--brand)', color: '#fff', border: '1px solid var(--brand)',
+  borderRadius: 'var(--radius-sm)', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
 };
-const miniSelect = { padding: '5px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 };
+const miniSelect = { padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border-strong)', fontSize: 13, fontFamily: 'inherit' };
 const linkBtn = {
-  background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer',
-  fontSize: 13, marginLeft: 12, padding: 0,
+  background: 'none', border: 'none', color: 'var(--brand-600)', cursor: 'pointer',
+  fontSize: 13, marginLeft: 12, padding: 0, fontFamily: 'inherit', fontWeight: 600,
 };
 const noticeStyle = {
-  background: '#dcfce7', color: '#166534', padding: '10px 14px', borderRadius: 8, fontSize: 14,
+  background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid var(--success-br)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: 14,
 };
 const errorStyle = {
-  background: '#fee2e2', color: '#b91c1c', padding: '10px 14px', borderRadius: 8, fontSize: 14,
+  background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-br)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: 14,
 };
-const tableStyle = { width: '100%', borderCollapse: 'collapse' as const, background: '#fff' };
-const th = { textAlign: 'left' as const, padding: 10, borderBottom: '2px solid #e2e8f0', fontSize: 13, color: '#475569' };
-const td = { padding: 10, borderBottom: '1px solid #eef2f7', fontSize: 14 };
+const tableStyle = { width: '100%', borderCollapse: 'separate' as const, borderSpacing: 0, background: 'var(--surface)', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)' };
+const th = { textAlign: 'left' as const, padding: '11px 14px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', fontSize: 11.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' as const, color: 'var(--muted)' };
+const td = { padding: '12px 14px', borderBottom: '1px solid var(--border)', fontSize: 14 };

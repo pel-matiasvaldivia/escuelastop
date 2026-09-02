@@ -258,8 +258,8 @@ const eyebrow = {
   textTransform: 'uppercase' as const, color: '#d42f2f',
 };
 const card = {
-  background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px',
-  boxShadow: '0 1px 2px rgba(20,30,45,.05)',
+  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px 18px',
+  boxShadow: 'var(--shadow-sm)',
 };
 
 function chipStyle(kind?: 'who' | 'rec' | 'gate') {
