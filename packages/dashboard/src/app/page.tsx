@@ -1,42 +1,49 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   api, auth, UnauthorizedError,
-  type Contact, type Enrollment, type SucursalInfo,
+  type Contact, type Enrollment, type SucursalInfo, type Course, type EnrollmentStats,
 } from '../lib/api';
 
-// Panel principal: bandeja de inscripciones + leads recientes.
+const PAGE_SIZE = 25;
+
+// Panel principal: bandeja de inscripciones (con búsqueda, filtros y paginación).
 export default function HomePage() {
   const router = useRouter();
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [rows, setRows] = useState<Enrollment[]>([]);
+  const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState<EnrollmentStats | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [sucursales, setSucursales] = useState<SucursalInfo[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(false);
+
+  // Filtros.
+  const [q, setQ] = useState('');
+  const [qDebounced, setQDebounced] = useState('');
+  const [course, setCourse] = useState('');
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+  const [page, setPage] = useState(1);
 
   const isAdmin = auth.isAdmin();
 
+  // Carga inicial (datos que no dependen de los filtros).
   useEffect(() => {
-    if (!auth.isAuthenticated()) {
-      router.replace('/login');
-      return;
-    }
+    if (!auth.isAuthenticated()) { router.replace('/login'); return; }
     (async () => {
       try {
-        const [e, c, s] = await Promise.all([
-          api.enrollments(), api.contacts(), api.sucursales(),
+        const [c, s, cat, st] = await Promise.all([
+          api.contacts(), api.sucursales(), api.catalog(), api.enrollmentStats(),
         ]);
-        setEnrollments(e);
-        setContacts(c);
-        setSucursales(s);
+        setContacts(c); setSucursales(s); setCourses(cat); setStats(st);
       } catch (err) {
-        if (err instanceof UnauthorizedError) {
-          router.replace('/login');
-          return;
-        }
+        if (err instanceof UnauthorizedError) { router.replace('/login'); return; }
         setError('No se pudo conectar con la API. ¿Está corriendo el backend?');
       } finally {
         setLoading(false);
@@ -45,28 +52,47 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Debounce del texto de búsqueda.
+  useEffect(() => {
+    const t = setTimeout(() => setQDebounced(q), 350);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  // Al cambiar un filtro, volver a la primera página.
+  useEffect(() => { setPage(1); }, [qDebounced, course, desde, hasta]);
+
+  // Carga de la bandeja según filtros + página.
+  useEffect(() => {
+    if (!auth.isAuthenticated()) return;
+    let cancelled = false;
+    setListLoading(true);
+    api.enrollments({ q: qDebounced, course, desde, hasta, page, pageSize: PAGE_SIZE })
+      .then((res) => { if (!cancelled) { setRows(res.rows); setTotal(res.total); } })
+      .catch((err) => { if (!cancelled && !(err instanceof UnauthorizedError)) setError('No se pudo cargar la bandeja.'); })
+      .finally(() => { if (!cancelled) setListLoading(false); });
+    return () => { cancelled = true; };
+  }, [qDebounced, course, desde, hasta, page]);
+
   const [payBusyId, setPayBusyId] = useState<string | null>(null);
 
-  // Reasignar una inscripción a otra sucursal (solo admin).
   async function reassign(enrollmentId: string, sede: string) {
     if (!sede) return;
     try {
       const updated = await api.assignSucursal(enrollmentId, sede);
-      setEnrollments((prev) => prev.map((e) => (e.id === enrollmentId ? updated : e)));
+      setRows((prev) => prev.map((e) => (e.id === enrollmentId ? { ...e, ...updated } : e)));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo reasignar');
     }
   }
 
-  // Registrar el pago total (la seña era un anticipo): habilita el código y
-  // notifica al alumno. El backend valida el acceso por sucursal.
   async function completePay(enrollmentId: string) {
     if (!confirm('¿Confirmás que el alumno completó el pago total del curso? ' +
       'Se habilita su código y se le avisa por WhatsApp y mail.')) return;
     setPayBusyId(enrollmentId);
     try {
       const updated = await api.completePayment(enrollmentId);
-      setEnrollments((prev) => prev.map((e) => (e.id === enrollmentId ? { ...e, ...updated } : e)));
+      setRows((prev) => prev.map((e) => (e.id === enrollmentId ? { ...e, ...updated } : e)));
+      api.enrollmentStats().then(setStats).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo registrar el pago');
     } finally {
@@ -74,19 +100,22 @@ export default function HomePage() {
     }
   }
 
+  function limpiar() { setQ(''); setCourse(''); setDesde(''); setHasta(''); }
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hayFiltros = !!(qDebounced || course || desde || hasta);
+  const desdeN = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const hastaN = Math.min(page * PAGE_SIZE, total);
+
+  // Nombres de curso únicos para el filtro (del catálogo).
+  const courseNames = useMemo(() => courses.map((c) => c.name), [courses]);
+
   if (loading) {
-    return (
-      <div className="empty"><span className="spinner" /> <span style={{ marginLeft: 8 }}>Cargando panel…</span></div>
-    );
+    return <div className="empty"><span className="spinner" /> <span style={{ marginLeft: 8 }}>Cargando panel…</span></div>;
   }
   if (error) {
     return <div className="card card-pad" style={{ color: 'var(--danger)', borderColor: 'var(--danger-br)', background: 'var(--danger-bg)' }}>{error}</div>;
   }
-
-  // KPIs
-  const preinscriptos = enrollments.filter((e) => e.status === 'preinscripto').length;
-  const pendientePago = enrollments.filter((e) => e.payment_status === 'aprobado' && !e.pago_completo).length;
-  const completos = enrollments.filter((e) => e.pago_completo).length;
 
   return (
     <div style={{ display: 'grid', gap: 26 }}>
@@ -100,22 +129,50 @@ export default function HomePage() {
       </div>
 
       <div className="stat-grid">
-        <Stat ico="📋" tint="var(--brand-050)" label="Inscripciones" value={enrollments.length} />
-        <Stat ico="🧾" tint="var(--warning-bg)" label="Pre-inscriptos" value={preinscriptos} />
-        <Stat ico="⏳" tint="var(--warning-bg)" label="Pago pendiente" value={pendientePago} />
-        <Stat ico="✅" tint="var(--success-bg)" label="Pago completo" value={completos} />
+        <Stat ico="📋" tint="var(--brand-050)" label="Inscripciones" value={stats?.total ?? 0} />
+        <Stat ico="🧾" tint="var(--warning-bg)" label="Pre-inscriptos" value={stats?.preinscriptos ?? 0} />
+        <Stat ico="⏳" tint="var(--warning-bg)" label="Pago pendiente" value={stats?.pendiente_pago ?? 0} />
+        <Stat ico="✅" tint="var(--success-bg)" label="Pago completo" value={stats?.completos ?? 0} />
         <Stat ico="👥" tint="var(--info-bg)" label="Leads" value={contacts.length} />
       </div>
 
       <section className="card">
-        <div className="card-head">
+        <div className="card-head" style={{ flexWrap: 'wrap' }}>
           <h2>Bandeja de inscripciones</h2>
-          <span className="badge">{enrollments.length}</span>
+          <span className="badge">{total}</span>
         </div>
-        <div className="table-wrap">
+
+        {/* Barra de filtros */}
+        <div style={filterBar}>
+          <input
+            className="input"
+            placeholder="🔎 Buscar por nombre, DNI o teléfono…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            style={{ flex: '2 1 240px' }}
+          />
+          <select className="select" value={course} onChange={(e) => setCourse(e.target.value)} style={{ flex: '1 1 200px' }}>
+            <option value="">Todos los cursos</option>
+            {courseNames.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <label style={dateWrap}>
+            <span style={dateLbl}>Desde</span>
+            <input className="input" type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+          </label>
+          <label style={dateWrap}>
+            <span style={dateLbl}>Hasta</span>
+            <input className="input" type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+          </label>
+          {hayFiltros && (
+            <button className="btn btn-ghost btn-sm" onClick={limpiar}>Limpiar</button>
+          )}
+        </div>
+
+        <div className="table-wrap" style={{ opacity: listLoading ? 0.6 : 1, transition: 'opacity .15s' }}>
           <table className="table">
             <thead>
               <tr>
+                <th>Alumno</th>
                 <th>Curso</th>
                 <th>Sede</th>
                 <th>Pago</th>
@@ -125,11 +182,14 @@ export default function HomePage() {
               </tr>
             </thead>
             <tbody>
-              {enrollments.length === 0 && (
-                <tr><td colSpan={6}><div className="empty">Sin inscripciones todavía.</div></td></tr>
+              {rows.length === 0 && (
+                <tr><td colSpan={7}><div className="empty">
+                  {hayFiltros ? 'No hay inscripciones que coincidan con la búsqueda.' : 'Sin inscripciones todavía.'}
+                </div></td></tr>
               )}
-              {enrollments.map((e) => (
+              {rows.map((e) => (
                 <tr key={e.id}>
+                  <td><AlumnoCell e={e} /></td>
                   <td style={{ fontWeight: 600 }}>{e.course ?? '—'}</td>
                   <td>
                     {isAdmin ? (
@@ -159,6 +219,18 @@ export default function HomePage() {
             </tbody>
           </table>
         </div>
+
+        {/* Paginación */}
+        <div style={pager}>
+          <span style={{ color: 'var(--muted)', fontSize: 13 }}>
+            {total === 0 ? 'Sin resultados' : `Mostrando ${desdeN}–${hastaN} de ${total}`}
+          </span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-sm" disabled={page <= 1 || listLoading} onClick={() => setPage((p) => Math.max(1, p - 1))}>← Anterior</button>
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Página {page} de {totalPages}</span>
+            <button className="btn btn-sm" disabled={page >= totalPages || listLoading} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Siguiente →</button>
+          </div>
+        </div>
       </section>
 
       <section className="card">
@@ -180,7 +252,7 @@ export default function HomePage() {
               {contacts.length === 0 && (
                 <tr><td colSpan={4}><div className="empty">Sin contactos todavía.</div></td></tr>
               )}
-              {contacts.map((c) => (
+              {contacts.slice(0, 25).map((c) => (
                 <tr key={c.id}>
                   <td style={{ fontWeight: 600 }}>{c.full_name ?? '(sin nombre)'}</td>
                   <td style={{ color: 'var(--text-2)' }}>{c.phone ?? '—'}</td>
@@ -206,6 +278,20 @@ function Stat({ ico, label, value, tint }: { ico: string; label: string; value: 
         {label}
       </div>
       <div className="stat-value">{value}</div>
+    </div>
+  );
+}
+
+/** Nombre y apellido + DNI + teléfono del alumno. */
+function AlumnoCell({ e }: { e: Enrollment }) {
+  const nombre = e.alumno_nombre?.trim();
+  return (
+    <div style={{ minWidth: 150 }}>
+      <div style={{ fontWeight: 600 }}>{nombre || <span style={{ color: 'var(--muted-2)' }}>(sin nombre)</span>}</div>
+      <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>
+        {e.alumno_dni ? `DNI ${e.alumno_dni}` : 'sin DNI'}
+        {e.alumno_telefono ? ` · ${e.alumno_telefono}` : ''}
+      </div>
     </div>
   );
 }
@@ -273,3 +359,14 @@ const STATUS_CLASS: Record<string, string> = {
 function StatusBadge({ status }: { status: string }) {
   return <span className={`badge ${STATUS_CLASS[status] ?? 'badge'}`}>{STATUS_LABEL[status] ?? status}</span>;
 }
+
+const filterBar: React.CSSProperties = {
+  display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end',
+  padding: '14px 20px', borderBottom: '1px solid var(--border)',
+};
+const dateWrap: React.CSSProperties = { display: 'grid', gap: 4, flex: '0 0 auto' };
+const dateLbl: React.CSSProperties = { fontSize: 11, color: 'var(--muted)', fontWeight: 600 };
+const pager: React.CSSProperties = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+  padding: '14px 20px', borderTop: '1px solid var(--border)', flexWrap: 'wrap',
+};
